@@ -112,11 +112,22 @@ app.include_router(whatsapp_router, prefix="/webhook", tags=["WhatsApp"])
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+
+    # Handle Railway's PORT environment variable
+    port = 8000
+    if 'PORT' in os.environ:
+        try:
+            port = int(os.environ['PORT'])
+        except ValueError:
+            port = 8000
+    else:
+        port = settings.port
 
     uvicorn.run(
         "src.main:app",
         host=settings.host,
-        port=settings.port,
+        port=port,
         reload=settings.debug,
         log_level=settings.log_level.lower()
     )
