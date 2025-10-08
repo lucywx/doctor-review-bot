@@ -32,7 +32,7 @@ class MessageHandler:
             message_text = message_text.strip()
 
             # Handle commands
-            if message_text.lower() in ["hi", "hello", "你好", "开始", "帮助", "/start"]:
+            if message_text.lower() in ["hi", "hello", "start", "help", "/start"]:
                 response = format_welcome_message()
                 await whatsapp_client.send_message(from_number, response)
                 return
@@ -113,10 +113,10 @@ class MessageHandler:
         """
         # Simple extraction for now
         # Remove common words
-        text = text.replace("医生", "").replace("大夫", "").strip()
+        text = text.replace("doctor", "").replace("dr", "").replace("dr.", "").strip()
 
         # TODO: Add more sophisticated name extraction logic
-        # - Handle titles (主任, 教授, etc.)
+        # - Handle titles (Dr., Prof., etc.)
         # - Extract hospital name separately
         # - Handle location
 
