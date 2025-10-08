@@ -31,60 +31,60 @@ class MockSearcher:
                 "doctor_name": doctor_name,
                 "source": "google_maps",
                 "url": f"https://maps.google.com/mock/{doctor_name}",
-                "snippet": f"{doctor_name}态度很好，诊断准确，医术精湛，强烈推荐！",
+                "snippet": f"{doctor_name} has excellent bedside manner, accurate diagnosis, and superb medical skills. Highly recommended!",
                 "rating": 5.0,
                 "review_date": "2025-09-15",
-                "author_name": "患者A",
+                "author_name": "Patient A",
                 "sentiment": None
             },
             {
                 "doctor_name": doctor_name,
                 "source": "google_maps",
                 "url": f"https://maps.google.com/mock/{doctor_name}",
-                "snippet": f"在{doctor_name}这里看病很放心，专业水平高，对患者很负责",
+                "snippet": f"Very confident in {doctor_name}'s care, high professional level, very responsible to patients",
                 "rating": 4.5,
                 "review_date": "2025-09-10",
-                "author_name": "患者B",
+                "author_name": "Patient B",
                 "sentiment": None
             },
             {
                 "doctor_name": doctor_name,
                 "source": "facebook",
                 "url": f"https://facebook.com/mock/{doctor_name}",
-                "snippet": f"{doctor_name}医生经验丰富，耐心解答问题，治疗效果很好",
+                "snippet": f"Dr. {doctor_name} is very experienced, patiently answers questions, excellent treatment results",
                 "rating": 5.0,
                 "review_date": "2025-08-28",
-                "author_name": "患者C",
+                "author_name": "Patient C",
                 "sentiment": None
             },
             {
                 "doctor_name": doctor_name,
                 "source": "google_maps",
                 "url": f"https://maps.google.com/mock/{doctor_name}",
-                "snippet": f"等待时间比较长，但{doctor_name}很认真负责，值得等待",
+                "snippet": f"Wait time is a bit long, but {doctor_name} is very conscientious and responsible, worth the wait",
                 "rating": 4.0,
                 "review_date": "2025-08-20",
-                "author_name": "患者D",
+                "author_name": "Patient D",
                 "sentiment": None
             },
             {
                 "doctor_name": doctor_name,
                 "source": "hospital_website",
                 "url": f"https://hospital.com/doctors/{doctor_name}",
-                "snippet": f"{doctor_name}服务态度一般，沟通不够充分，希望改进",
+                "snippet": f"{doctor_name} service attitude is average, communication not sufficient, hope for improvement",
                 "rating": 2.5,
                 "review_date": "2025-08-05",
-                "author_name": "患者E",
+                "author_name": "Patient E",
                 "sentiment": None
             },
             {
                 "doctor_name": doctor_name,
                 "source": "facebook",
                 "url": f"https://facebook.com/mock/{doctor_name}",
-                "snippet": f"对{doctor_name}的诊断不太满意，感觉不够细致",
+                "snippet": f"Not very satisfied with {doctor_name}'s diagnosis, feels not detailed enough",
                 "rating": 2.0,
                 "review_date": "2025-07-15",
-                "author_name": "患者F",
+                "author_name": "Patient F",
                 "sentiment": None
             }
         ]

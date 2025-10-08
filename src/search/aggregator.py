@@ -14,10 +14,10 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Use mock searcher in development if API keys are not set
+# Use mock searcher if API keys are not set (development or production)
 USE_MOCK = (
-    settings.environment == "development" and
-    settings.google_places_api_key == "your_google_api_key"
+    settings.google_places_api_key == "your_google_api_key" or
+    settings.facebook_access_token == "your_facebook_token"
 )
 
 
