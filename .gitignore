@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+secrets.env
 
 # API Keys and secrets
 *api_key*

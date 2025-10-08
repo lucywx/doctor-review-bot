@@ -8,8 +8,8 @@
 
 从您的 Twilio Console 截图中，我看到您已经配置了：
 
-- ✅ **Account SID**: `AC1ee327e499287690c7357addf217950d`
-- ✅ **WhatsApp 号码**: `+14155238886`
+- ✅ **Account SID**: `your_twilio_account_sid_here`
+- ✅ **WhatsApp 号码**: `+1234567890`
 - ✅ **Twilio Console 访问**: 已登录并可以发送消息
 
 ---
@@ -76,7 +76,7 @@ cd /Users/lucyy/Desktop/coding/project02-docreview
 WHATSAPP_PROVIDER=twilio
 TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
 TWILIO_AUTH_TOKEN=your_auth_token_here
-TWILIO_WHATSAPP_NUMBER=+14155238886
+TWILIO_WHATSAPP_NUMBER=+1234567890
 VERIFY_TOKEN=twilio_verify_token_20250108
 ```
 
