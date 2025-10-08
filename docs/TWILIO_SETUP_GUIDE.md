@@ -14,8 +14,8 @@ cd /Users/lucyy/Desktop/coding/project02-docreview
 ```
 
 脚本会自动使用您已获取的信息：
-- ✅ Account SID: `AC1ee327e499287690c7357addf217950d`
-- ✅ WhatsApp 号码: `+14155238886`
+- ✅ Account SID: `your_twilio_account_sid_here`
+- ✅ WhatsApp 号码: `+1234567890`
 - ⏳ 只需输入 Auth Token
 
 ### Step 2: 启动测试环境
