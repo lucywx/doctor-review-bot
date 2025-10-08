@@ -9,12 +9,6 @@ from contextlib import asynccontextmanager
 import logging
 
 from src.config import settings
-
-# Choose database based on environment
-if settings.environment == "production":
-    from src.database import db
-else:
-    from src.database_sqlite import db
 # Enhanced logging and error handling
 from src.utils.logger import setup_logging, get_logger
 from src.utils.error_handler import register_error_handlers
@@ -33,6 +27,14 @@ async def lifespan(app: FastAPI):
     logger.info(f"Debug mode: {settings.debug}")
 
     try:
+        # Choose database based on environment
+        if settings.environment == "production":
+            from src.database import db
+            logger.info("📊 Using PostgreSQL database")
+        else:
+            from src.database_sqlite import db
+            logger.info("📊 Using SQLite database")
+        
         # Connect to database
         await db.connect()
         logger.info("✅ Database connected")
@@ -45,8 +47,11 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("👋 Shutting down Doctor Review Bot...")
-    await db.disconnect()
-    logger.info("✅ Cleanup completed")
+    try:
+        await db.disconnect()
+        logger.info("✅ Cleanup completed")
+    except Exception as e:
+        logger.error(f"❌ Cleanup failed: {e}")
 
 
 # Create FastAPI app
@@ -89,6 +94,12 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     try:
+        # Choose database based on environment
+        if settings.environment == "production":
+            from src.database import db
+        else:
+            from src.database_sqlite import db
+        
         # Check database connection
         await db.fetchval("SELECT 1")
 
