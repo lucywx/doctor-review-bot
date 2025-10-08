@@ -9,8 +9,12 @@ from contextlib import asynccontextmanager
 import logging
 
 from src.config import settings
-# Use SQLite for local development
-from src.database_sqlite import db
+
+# Choose database based on environment
+if settings.environment == "production":
+    from src.database import db
+else:
+    from src.database_sqlite import db
 # Enhanced logging and error handling
 from src.utils.logger import setup_logging, get_logger
 from src.utils.error_handler import register_error_handlers
