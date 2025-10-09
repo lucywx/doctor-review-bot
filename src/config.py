@@ -28,11 +28,9 @@ class Settings(BaseSettings):
     whatsapp_access_token: Optional[str] = Field(None, env="WHATSAPP_ACCESS_TOKEN")
     verify_token: str = Field(..., env="VERIFY_TOKEN")
 
-    # Google Places API
-    google_places_api_key: str = Field(..., env="GOOGLE_PLACES_API_KEY")
-
-    # Facebook Graph API
-    facebook_access_token: str = Field(..., env="FACEBOOK_ACCESS_TOKEN")
+    # Legacy API keys (no longer used - kept for backward compatibility)
+    google_places_api_key: Optional[str] = Field("not_required", env="GOOGLE_PLACES_API_KEY")
+    facebook_access_token: Optional[str] = Field("not_required", env="FACEBOOK_ACCESS_TOKEN")
 
     # OpenAI API
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
