@@ -5,7 +5,6 @@ Search aggregator - uses OpenAI web search for doctor reviews
 import logging
 from typing import List, Dict
 from src.search.openai_web_searcher import openai_web_searcher
-from src.analysis.sentiment import sentiment_analyzer
 from src.cache.manager import cache_manager
 from src.config import settings
 
@@ -76,26 +75,21 @@ class SearchAggregator:
 
             logger.info(f"📊 Found {len(all_reviews)} reviews from web search")
 
-            # Step 3: Analyze sentiment
-            logger.info("🤖 Analyzing sentiment...")
-            analyzed_reviews = await sentiment_analyzer.analyze_reviews(all_reviews)
-            logger.info(f"✅ Analyzed {len(analyzed_reviews)} reviews")
-
-            # Step 4: Save to cache
+            # Step 3: Save to cache (sentiment analysis removed for speed)
             logger.info("💾 Saving to cache...")
             await cache_manager.save_reviews(
                 doctor_id=doctor_id,
                 doctor_name=doctor_name,
-                reviews=analyzed_reviews,
+                reviews=all_reviews,
                 ttl_days=7
             )
 
             return {
                 "doctor_name": doctor_name,
                 "doctor_id": doctor_id,
-                "reviews": analyzed_reviews,
+                "reviews": all_reviews,
                 "source": "fresh",
-                "total_count": len(analyzed_reviews)
+                "total_count": len(all_reviews)
             }
 
         except Exception as e:

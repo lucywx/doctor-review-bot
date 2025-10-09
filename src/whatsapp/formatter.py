@@ -9,7 +9,7 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
 
     Args:
         doctor_name: Doctor's name
-        reviews: List of review dicts with keys: snippet, sentiment, source, url
+        reviews: List of review dicts with keys: snippet, source, url, author_name, review_date
 
     Returns:
         Formatted message string
@@ -17,87 +17,69 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
     if not reviews:
         return f"❌ Sorry, no reviews found for *{doctor_name}*.\n\nPlease try:\n• Enter full name\n• Add hospital name\n• Check spelling"
 
-    # Separate by sentiment
-    positive = [r for r in reviews if r.get("sentiment") == "positive"]
-    negative = [r for r in reviews if r.get("sentiment") == "negative"]
-    neutral = [r for r in reviews if r.get("sentiment") == "neutral"]
-
-    # Source emojis and names
+    # Source emojis and names mapping
     source_emoji = {
         "google_maps": "🗺️",
+        "google maps": "🗺️",
         "facebook": "👥",
         "hospital_website": "🏥",
+        "lookp": "💬",
+        "lowyat": "💬",
+        "forum": "💬",
+        "blog": "📝",
+        "web_search": "🌐",
         "other": "📄"
     }
 
-    source_names = {
-        "google_maps": "Google Maps",
-        "facebook": "Facebook",
-        "hospital_website": "Hospital Website",
-        "other": "Other Sources"
-    }
+    def get_source_emoji(source: str) -> str:
+        """Get emoji for source"""
+        source_lower = source.lower()
+        for key, emoji in source_emoji.items():
+            if key in source_lower:
+                return emoji
+        return "📄"
 
+    # Build header
     message = f"🔍 *{doctor_name}* Review Summary\n"
     message += f"━━━━━━━━━━━━━━━\n"
     message += f"📊 Found *{len(reviews)}* reviews\n\n"
 
-    # Positive reviews
-    if positive:
-        message += "✅ *Positive Reviews* ({}):\n\n".format(len(positive))
-        for i, review in enumerate(positive[:5], 1):  # Show top 5
-            emoji = source_emoji.get(review.get("source", ""), "📄")
-            source_name = source_names.get(review.get("source", ""), "Other Sources")
-            snippet = review.get("snippet", "")[:120]
-            rating = review.get("rating")
-            rating_str = f" ⭐{rating}" if rating else ""
+    # Show reviews (limit to 8)
+    display_reviews = reviews[:8]
 
-            message += f"{i}. {snippet}...{rating_str}\n"
-            message += f"   {emoji} {source_name}\n"
+    for i, review in enumerate(display_reviews, 1):
+        snippet = review.get("snippet", "")[:150]
+        source = review.get("source", "Web")
+        author = review.get("author_name", "")
+        date = review.get("review_date", "")
+        url = review.get("url", "")
+        rating = review.get("rating")
 
-            # Add source link
-            url = review.get("url", "")
-            if url and len(url) > 10:
-                message += f"   🔗 {url}\n"
+        # Format review
+        emoji = get_source_emoji(source)
 
-            message += "\n"
+        message += f"{i}. {snippet}...\n"
 
-    # Negative reviews
-    if negative:
-        message += "❌ *Negative Reviews* ({}):\n\n".format(len(negative))
-        for i, review in enumerate(negative[:5], 1):  # Show top 5
-            emoji = source_emoji.get(review.get("source", ""), "📄")
-            source_name = source_names.get(review.get("source", ""), "Other Sources")
-            snippet = review.get("snippet", "")[:120]
-            rating = review.get("rating")
-            rating_str = f" ⭐{rating}" if rating else ""
+        # Add metadata line
+        metadata = f"   {emoji} {source}"
+        if author and author != "Anonymous":
+            metadata += f" • {author}"
+        if date:
+            metadata += f" • {date}"
+        if rating and rating > 0:
+            metadata += f" • ⭐{rating}"
 
-            message += f"{i}. {snippet}...{rating_str}\n"
-            message += f"   {emoji} {source_name}\n"
+        message += f"{metadata}\n"
 
-            # Add source link
-            url = review.get("url", "")
-            if url and len(url) > 10:
-                message += f"   🔗 {url}\n"
+        # Add source link if available
+        if url and len(url) > 10:
+            message += f"   🔗 {url}\n"
 
-            message += "\n"
+        message += "\n"
 
-    # Neutral reviews
-    if neutral and len(positive) + len(negative) < 5:
-        message += "ℹ️ *Neutral Reviews* ({}):\n\n".format(len(neutral))
-        for i, review in enumerate(neutral[:3], 1):
-            emoji = source_emoji.get(review.get("source", ""), "📄")
-            source_name = source_names.get(review.get("source", ""), "Other Sources")
-            snippet = review.get("snippet", "")[:120]
-
-            message += f"{i}. {snippet}...\n"
-            message += f"   {emoji} {source_name}\n"
-
-            # Add source link
-            url = review.get("url", "")
-            if url and len(url) > 10:
-                message += f"   🔗 {url}\n"
-
-            message += "\n"
+    # Show count if more reviews available
+    if len(reviews) > 8:
+        message += f"_... and {len(reviews) - 8} more reviews_\n\n"
 
     # Footer
     message += "━━━━━━━━━━━━━━━\n"
@@ -142,4 +124,4 @@ def format_error_message(error_type: str = "general") -> str:
 
 def format_processing_message() -> str:
     """Message shown while processing"""
-    return "⏳ Searching for reviews across the web, please wait...\n\n_Estimated time: 30-60 seconds_\n\n🔍 Searching multiple sources\n🤖 Analyzing sentiment\n📊 Preparing summary..."
+    return "⏳ Searching for reviews across the web, please wait...\n\n_Estimated time: 15-30 seconds_\n\n🔍 Searching multiple sources\n📊 Preparing summary..."
