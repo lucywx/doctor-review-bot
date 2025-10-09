@@ -3,13 +3,22 @@ Configuration management module
 Handles all environment variables and settings
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from typing import Optional
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        # .env file takes priority over environment variables
+        env_ignore_empty=True,
+        extra="ignore"
+    )
 
     # Database
     database_url: str = Field(..., env="DATABASE_URL")
@@ -58,11 +67,12 @@ class Settings(BaseSettings):
     # Optional: Redis
     redis_url: Optional[str] = Field(None, env="REDIS_URL")
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-
 
 # Create global settings instance
+# Force reload from .env by clearing the bad env var first
+import os
+if 'OPENAI_API_KEY' in os.environ and ' ' in os.environ['OPENAI_API_KEY']:
+    # Clear corrupted environment variable
+    del os.environ['OPENAI_API_KEY']
+
 settings = Settings()

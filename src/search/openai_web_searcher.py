@@ -57,12 +57,18 @@ class OpenAIWebSearcher:
             
             search_query = " ".join(query_parts) + " doctor reviews patient feedback"
             
-            # Use OpenAI Responses API with web search
+            # Use OpenAI Responses API with web search (ChatGPT-like capability)
+            logger.info(f"🔍 Calling OpenAI Responses API with query: {search_query}")
             response = await self.client.responses.create(
-                model="gpt-4o",  # Use model that supports web search
-                tools=[{"type": "web_search"}],  # Correct tool name for responses API
-                input=f"Search the web for patient reviews about {search_query}. Find reviews from Google Maps, hospital websites, medical forums, and other sources. Return the reviews in JSON format with fields: source, snippet, rating, author_name, review_date, url."
+                model="gpt-4o",  # Use gpt-4o model for web search
+                tools=[{"type": "web_search"}],  # Enable web search tool
+                input=f"""Search for patient reviews and feedback about Dr {doctor_name}.
+                Look for reviews from Google Maps, hospital websites, medical forums, and social media.
+                Return the reviews in JSON format with fields: source, snippet, rating, author_name, review_date, url.
+                If you find reviews, return them. If no reviews found, return empty array []."""
             )
+
+            logger.info(f"✅ OpenAI API call successful, response type: {type(response)}")
 
             # Parse response and extract reviews
             reviews = self._parse_openai_response(response, doctor_name)
@@ -77,55 +83,84 @@ class OpenAIWebSearcher:
             }
 
         except Exception as e:
-            logger.error(f"Error in OpenAI web search: {e}")
+            import traceback
+            logger.error(f"❌ Error in OpenAI web search: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             # CRITICAL: Never return mock data for doctor reviews
             return {
                 "doctor_name": doctor_name,
                 "reviews": [],
                 "source": "error",
                 "total_count": 0,
-                "error": "Search failed - no mock data returned for safety"
+                "error": f"Search failed: {str(e)}"
             }
 
     def _parse_openai_response(self, response, doctor_name: str) -> List[Dict]:
         """Parse OpenAI response and extract reviews"""
         try:
             import json
-            
+
             # Extract content from response (Responses API format)
+            # The Responses API returns output_text attribute
             if hasattr(response, 'output_text'):
                 content = response.output_text.strip()
+            elif hasattr(response, 'output') and isinstance(response.output, list):
+                # Try to get text from output array
+                content = ""
+                for item in response.output:
+                    if hasattr(item, 'text'):
+                        content += item.text
             elif hasattr(response, 'choices'):
+                # Fallback for Chat Completions API format
                 content = response.choices[0].message.content.strip()
             else:
+                logger.warning(f"Unknown response format: {type(response)}")
+                logger.debug(f"Response attributes: {dir(response)}")
                 content = str(response).strip()
-            
+
             logger.info(f"📝 OpenAI response: {content[:200]}...")
-            
-            # Try to parse as JSON first
-            try:
-                if content.startswith('[') and content.endswith(']'):
-                    reviews_data = json.loads(content)
+
+            # Try to extract JSON from markdown code blocks
+            json_content = None
+            if '```json' in content:
+                # Extract JSON from markdown code block
+                import re
+                json_match = re.search(r'```json\s*\n(.*?)\n```', content, re.DOTALL)
+                if json_match:
+                    json_content = json_match.group(1).strip()
+                    logger.info("📝 Found JSON in markdown code block")
+            elif content.strip().startswith('[') and content.strip().endswith(']'):
+                # Direct JSON array
+                json_content = content.strip()
+
+            # Try to parse as JSON
+            if json_content:
+                try:
+                    reviews_data = json.loads(json_content)
                     reviews = []
-                    
+
                     for review_data in reviews_data:
                         if isinstance(review_data, dict):
+                            # Handle null values properly
+                            rating = review_data.get("rating")
+                            rating = float(rating) if rating is not None else 0.0
+
                             reviews.append({
                                 "doctor_name": doctor_name,
-                                "source": review_data.get("source", "knowledge_base"),
-                                "url": review_data.get("url", ""),
+                                "source": review_data.get("source", "web_search"),
+                                "url": review_data.get("url") or "",
                                 "snippet": review_data.get("snippet", ""),
-                                "rating": float(review_data.get("rating", 0)),
-                                "review_date": review_data.get("review_date", ""),
-                                "author_name": review_data.get("author_name", "Anonymous"),
+                                "rating": rating,
+                                "review_date": review_data.get("review_date") or "",
+                                "author_name": review_data.get("author_name") or "Anonymous",
                                 "sentiment": None  # Will be analyzed later
                             })
-                    
+
                     logger.info(f"✅ Parsed {len(reviews)} reviews from JSON")
                     return reviews
-                    
-            except json.JSONDecodeError:
-                logger.info("📝 Response is not JSON, trying text parsing...")
+
+                except json.JSONDecodeError as e:
+                    logger.warning(f"📝 JSON parsing failed: {e}, trying text parsing...")
             
             # If not JSON, try to extract meaningful content
             if content and len(content) > 50:
