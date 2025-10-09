@@ -15,17 +15,17 @@ class OpenAIWebSearcher:
     """Search for doctor reviews using OpenAI's web_search tool"""
 
     def __init__(self):
-        self.use_mock = (
-            settings.openai_api_key == "your_openai_api_key" or
-            settings.openai_api_key == "not_configured"
-        )
+        # CRITICAL: Never use mock data for doctor reviews - legal risk!
+        # Always use real OpenAI API for production
+        self.use_mock = False  # Disabled for safety
 
-        if not self.use_mock:
+        try:
             self.client = AsyncOpenAI(api_key=settings.openai_api_key)
             self.model = settings.openai_model
             logger.info(f"🌐 OpenAI Web Searcher initialized (model: {self.model})")
-        else:
-            logger.info("🧪 Using MOCK mode for OpenAI web searcher")
+        except Exception as e:
+            logger.error(f"❌ OpenAI API initialization failed: {e}")
+            raise Exception("OpenAI API key is required for doctor review search")
 
     async def search_doctor_reviews(
         self,
@@ -45,10 +45,7 @@ class OpenAIWebSearcher:
             Dict with reviews and metadata
         """
         try:
-            if self.use_mock:
-                logger.info("🧪 Using MOCK web search")
-                return await self._mock_search(doctor_name, specialty, location)
-
+            # CRITICAL: Never use mock data for doctor reviews
             logger.info(f"🌐 Searching web for: {doctor_name}")
             
             # Build search query
@@ -96,8 +93,14 @@ class OpenAIWebSearcher:
 
         except Exception as e:
             logger.error(f"Error in OpenAI web search: {e}")
-            # Fallback to mock search
-            return await self._mock_search(doctor_name, specialty, location)
+            # CRITICAL: Never return mock data for doctor reviews
+            return {
+                "doctor_name": doctor_name,
+                "reviews": [],
+                "source": "error",
+                "total_count": 0,
+                "error": "Search failed - no mock data returned for safety"
+            }
 
     def _parse_openai_response(self, response, doctor_name: str) -> List[Dict]:
         """Parse OpenAI response and extract reviews"""
@@ -131,50 +134,7 @@ class OpenAIWebSearcher:
             logger.error(f"Error parsing OpenAI response: {e}")
             return []
 
-    async def _mock_search(self, doctor_name: str, specialty: str, location: str) -> Dict:
-        """Mock search for testing"""
-        logger.info(f"🧪 [MOCK] Web searching for: {doctor_name}")
-        
-        # Generate mock reviews
-        mock_reviews = [
-            {
-                "doctor_name": doctor_name,
-                "source": "google_maps",
-                "url": f"https://maps.google.com/mock/{doctor_name}",
-                "snippet": f"{doctor_name} has excellent bedside manner and accurate diagnosis. Highly recommended by patients.",
-                "rating": 4.8,
-                "review_date": "2025-01-05",
-                "author_name": "Patient A",
-                "sentiment": None
-            },
-            {
-                "doctor_name": doctor_name,
-                "source": "hospital_website",
-                "url": f"https://hospital.com/doctors/{doctor_name}",
-                "snippet": f"Dr. {doctor_name} is very experienced and patient. Great communication skills and thorough examination.",
-                "rating": 4.5,
-                "review_date": "2025-01-03",
-                "author_name": "Patient B", 
-                "sentiment": None
-            },
-            {
-                "doctor_name": doctor_name,
-                "source": "medical_forum",
-                "url": f"https://forum.com/doctor/{doctor_name}",
-                "snippet": f"Professional and caring. {doctor_name} takes time to explain everything clearly.",
-                "rating": 4.2,
-                "review_date": "2025-01-01",
-                "author_name": "Patient C",
-                "sentiment": None
-            }
-        ]
-        
-        return {
-            "doctor_name": doctor_name,
-            "reviews": mock_reviews,
-            "source": "mock_web_search",
-            "total_count": len(mock_reviews)
-        }
+    # REMOVED: Mock search function - too dangerous for doctor reviews
 
 
 # Global instance
