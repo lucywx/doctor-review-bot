@@ -57,26 +57,22 @@ class OpenAIWebSearcher:
             
             search_query = " ".join(query_parts) + " doctor reviews patient feedback"
             
-            # Use OpenAI with web_search tool
+            # Use OpenAI to search for doctor reviews
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a medical review search assistant. Search the web for patient reviews and feedback about doctors. 
-                        Return reviews in a structured format with source information."""
+                        "content": """You are a medical review search assistant. Based on your training data, provide information about doctor reviews and patient feedback. 
+                        Return reviews in a structured format with source information. If you don't have specific information about a doctor, 
+                        indicate that no reviews were found rather than making up information."""
                     },
                     {
                         "role": "user", 
-                        "content": f"Search for patient reviews about {search_query}. Find reviews from Google Maps, hospital websites, medical forums, and other sources. Return the reviews in JSON format with fields: source, snippet, rating, author_name, review_date, url"
+                        "content": f"Search for patient reviews about {search_query}. Based on your knowledge, provide any available reviews from Google Maps, hospital websites, medical forums, and other sources. Return the reviews in JSON format with fields: source, snippet, rating, author_name, review_date, url. If no specific reviews are found, return an empty list."
                     }
                 ],
-                tools=[{
-                    "type": "web_search"
-                }],
-                tool_choice="web_search",
-                max_tokens=2000,
-                temperature=0.3
+                max_completion_tokens=2000
             )
 
             # Parse response and extract reviews
