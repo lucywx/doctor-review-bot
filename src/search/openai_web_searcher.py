@@ -57,22 +57,11 @@ class OpenAIWebSearcher:
             
             search_query = " ".join(query_parts) + " doctor reviews patient feedback"
             
-            # Use OpenAI to search for doctor reviews
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are a medical review search assistant. Based on your training data, provide information about doctor reviews and patient feedback. 
-                        Return reviews in a structured format with source information. If you don't have specific information about a doctor, 
-                        indicate that no reviews were found rather than making up information."""
-                    },
-                    {
-                        "role": "user", 
-                        "content": f"Search for patient reviews about {search_query}. Based on your knowledge, provide any available reviews from Google Maps, hospital websites, medical forums, and other sources. Return the reviews in JSON format with fields: source, snippet, rating, author_name, review_date, url. If no specific reviews are found, return an empty list."
-                    }
-                ],
-                max_completion_tokens=2000
+            # Use OpenAI Responses API with web search
+            response = await self.client.responses.create(
+                model="gpt-4o",  # Use model that supports web search
+                tools=[{"type": "web_search"}],  # Correct tool name for responses API
+                input=f"Search the web for patient reviews about {search_query}. Find reviews from Google Maps, hospital websites, medical forums, and other sources. Return the reviews in JSON format with fields: source, snippet, rating, author_name, review_date, url."
             )
 
             # Parse response and extract reviews
@@ -101,30 +90,61 @@ class OpenAIWebSearcher:
     def _parse_openai_response(self, response, doctor_name: str) -> List[Dict]:
         """Parse OpenAI response and extract reviews"""
         try:
-            reviews = []
+            import json
             
-            # Extract content from response
-            content = response.choices[0].message.content
+            # Extract content from response (Responses API format)
+            if hasattr(response, 'output_text'):
+                content = response.output_text.strip()
+            elif hasattr(response, 'choices'):
+                content = response.choices[0].message.content.strip()
+            else:
+                content = str(response).strip()
             
-            # Simple parsing - in real implementation, you'd want more sophisticated parsing
-            # For now, create structured reviews from the content
-            if content:
-                # Split content into potential reviews
-                lines = content.split('\n')
-                for i, line in enumerate(lines[:10]):  # Limit to 10 reviews
-                    if len(line.strip()) > 20:  # Filter out short lines
-                        reviews.append({
-                            "doctor_name": doctor_name,
-                            "source": "web_search",
-                            "url": f"https://example.com/review/{i}",
-                            "snippet": line.strip()[:200],  # Limit snippet length
-                            "rating": 4.0,  # Default rating
-                            "review_date": "2025-01-01",
-                            "author_name": f"Patient {i+1}",
-                            "sentiment": None  # Will be analyzed later
-                        })
+            logger.info(f"📝 OpenAI response: {content[:200]}...")
             
-            return reviews
+            # Try to parse as JSON first
+            try:
+                if content.startswith('[') and content.endswith(']'):
+                    reviews_data = json.loads(content)
+                    reviews = []
+                    
+                    for review_data in reviews_data:
+                        if isinstance(review_data, dict):
+                            reviews.append({
+                                "doctor_name": doctor_name,
+                                "source": review_data.get("source", "knowledge_base"),
+                                "url": review_data.get("url", ""),
+                                "snippet": review_data.get("snippet", ""),
+                                "rating": float(review_data.get("rating", 0)),
+                                "review_date": review_data.get("review_date", ""),
+                                "author_name": review_data.get("author_name", "Anonymous"),
+                                "sentiment": None  # Will be analyzed later
+                            })
+                    
+                    logger.info(f"✅ Parsed {len(reviews)} reviews from JSON")
+                    return reviews
+                    
+            except json.JSONDecodeError:
+                logger.info("📝 Response is not JSON, trying text parsing...")
+            
+            # If not JSON, try to extract meaningful content
+            if content and len(content) > 50:
+                # Create a single review from the content
+                reviews = [{
+                    "doctor_name": doctor_name,
+                    "source": "knowledge_base",
+                    "url": "",
+                    "snippet": content[:300],
+                    "rating": 4.0,
+                    "review_date": "2025-01-01",
+                    "author_name": "OpenAI Knowledge",
+                    "sentiment": None
+                }]
+                logger.info(f"✅ Created 1 review from text content")
+                return reviews
+            
+            logger.info("❌ No meaningful content found")
+            return []
 
         except Exception as e:
             logger.error(f"Error parsing OpenAI response: {e}")
