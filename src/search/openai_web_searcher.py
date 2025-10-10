@@ -151,12 +151,12 @@ class OpenAIWebSearcher:
             response = await self.client.responses.create(
                 model="gpt-4o",  # Must use gpt-4o for web_search tool
                 tools=[{"type": "web_search"}],  # Enable web search tool
-                input=f"""Find patient reviews: "Dr {doctor_name}" Malaysia
+                input=f"""Find patient reviews for: "Dr {doctor_name}"
 
-Search: Facebook, Lowyat.net, Google Maps, forums, blogs
+Search globally: Google Maps, Facebook, Yelp, Healthgrades, RateMDs, Zocdoc, forums, blogs, review sites
 
 Return JSON only:
-[{{"source":"Lowyat.net","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":null,"url":"https://forum.lowyat.net/..."}}]
+[{{"source":"Google Maps","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":4.5,"url":"https://maps.google.com/..."}}]
 
 CRITICAL: "url" must be full http/https link (not description)
 Empty if none: []"""
