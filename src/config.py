@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     rate_limit_per_user_daily: int = Field(default=50, env="RATE_LIMIT_PER_USER_DAILY")
     rate_limit_per_minute: int = Field(default=10, env="RATE_LIMIT_PER_MINUTE")
 
+    # User Access Control
+    admin_phone_number: str = Field(..., env="ADMIN_PHONE_NUMBER")  # Your WhatsApp number
+    require_approval: bool = Field(default=True, env="REQUIRE_APPROVAL")  # Enable/disable approval system
+
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     sentry_dsn: Optional[str] = Field(None, env="SENTRY_DSN")

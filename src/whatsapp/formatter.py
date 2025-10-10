@@ -112,4 +112,4 @@ def format_error_message(error_type: str = "general") -> str:
 
 def format_processing_message() -> str:
     """Message shown while processing"""
-    return "⏳ Searching for reviews across the web, please wait...\n\n_Estimated time: 15-30 seconds_\n\n🔍 Searching multiple sources\n📊 Preparing summary..."
+    return "🔍 Searching... it takes 15-30 seconds"
