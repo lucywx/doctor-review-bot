@@ -62,10 +62,18 @@ class OpenAIWebSearcher:
             response = await self.client.responses.create(
                 model="gpt-4o",  # Use gpt-4o model for web search
                 tools=[{"type": "web_search"}],  # Enable web search tool
-                input=f"""Search for patient reviews and feedback about Dr {doctor_name}.
-                Look for reviews from Google Maps, hospital websites, medical forums, and social media.
-                Return the reviews in JSON format with fields: source, snippet, rating, author_name, review_date, url.
-                If you find reviews, return them. If no reviews found, return empty array []."""
+                input=f"""Search the web for patient reviews about Dr {doctor_name}.
+
+IMPORTANT: Return ONLY valid JSON, no explanations.
+
+Format:
+[
+  {{"source": "LookP", "snippet": "review text here", "rating": null, "author_name": "Name", "review_date": "2023-01-01", "url": "https://..."}}
+]
+
+If no reviews found, return: []
+
+Search: Google Maps, hospital websites, medical forums, social media."""
             )
 
             logger.info(f"✅ OpenAI API call successful, response type: {type(response)}")
@@ -120,18 +128,29 @@ class OpenAIWebSearcher:
 
             logger.info(f"📝 OpenAI response: {content[:200]}...")
 
-            # Try to extract JSON from markdown code blocks
+            # Try to extract JSON from response
             json_content = None
+            import re
+
+            # Method 1: Check for markdown code block
             if '```json' in content:
-                # Extract JSON from markdown code block
-                import re
                 json_match = re.search(r'```json\s*\n(.*?)\n```', content, re.DOTALL)
                 if json_match:
                     json_content = json_match.group(1).strip()
                     logger.info("📝 Found JSON in markdown code block")
+
+            # Method 2: Check if starts/ends with []
             elif content.strip().startswith('[') and content.strip().endswith(']'):
-                # Direct JSON array
                 json_content = content.strip()
+                logger.info("📝 Found direct JSON array")
+
+            # Method 3: Extract JSON array from text (even if surrounded by text)
+            elif '[' in content and ']' in content:
+                # Find JSON array pattern anywhere in text
+                json_match = re.search(r'\[\s*\{.*?\}\s*\]|\[\s*\]', content, re.DOTALL)
+                if json_match:
+                    json_content = json_match.group(0).strip()
+                    logger.info("📝 Extracted JSON array from text")
 
             # Try to parse as JSON
             if json_content:
