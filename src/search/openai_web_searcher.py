@@ -62,18 +62,45 @@ class OpenAIWebSearcher:
             response = await self.client.responses.create(
                 model="gpt-4o",  # Use gpt-4o model for web search
                 tools=[{"type": "web_search"}],  # Enable web search tool
-                input=f"""Search the web for patient reviews about Dr {doctor_name}.
+                input=f"""Search for REAL patient reviews about Dr {doctor_name} (practicing in Malaysia).
 
-IMPORTANT: Return ONLY valid JSON, no explanations.
+SEARCH SOURCES (in priority order):
+1. Medical Review Platforms:
+   - LookP.com (Malaysia doctor reviews)
+   - MediSata.com
+   - TalkHealthAsia
+   - Google Maps Malaysia
 
-Format:
-[
-  {{"source": "LookP", "snippet": "review text here", "rating": null, "author_name": "Name", "review_date": "2023-01-01", "url": "https://..."}}
-]
+2. Social Media (PUBLIC posts only):
+   - Facebook (clinic pages, public posts, community groups)
+   - Instagram (public clinic accounts)
 
-If no reviews found, return: []
+3. Forums & Communities:
+   - Lowyat.net (Malaysia local forum - PRIORITY)
+   - Reddit Malaysia
+   - BabyCenter Malaysia (for ob/gyn, pediatrics)
 
-Search: Google Maps, hospital websites, medical forums, social media."""
+4. Patient Blogs/Personal Experiences:
+   - Search: "Dr {doctor_name} experience blog"
+   - Personal blogs sharing medical journey
+   - Medium/Blogspot posts about treatment experience
+
+EXCLUDE:
+✗ Editorial content from health websites (not patient reviews)
+✗ Promotional articles
+✗ News articles about the doctor
+✗ Medical advice articles
+
+OUTPUT REQUIREMENTS (CRITICAL - SYSTEM WILL FAIL IF NOT FOLLOWED):
+1. Return ONLY the JSON array - nothing else
+2. NO introductions (do not write "Here are the reviews...")
+3. NO explanations after the JSON
+4. NO citations or footnotes
+5. NO markdown code blocks (do not wrap in ```)
+6. Start response with [ and end with ]
+
+Format: [{{"source":"LookP","snippet":"review text","rating":null,"author_name":"Name","review_date":"2023-01-01","url":"https://..."}}]
+Empty: []"""
             )
 
             logger.info(f"✅ OpenAI API call successful, response type: {type(response)}")
