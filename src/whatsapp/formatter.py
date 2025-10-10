@@ -42,26 +42,29 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
         url = review.get("url", "")
         rating = review.get("rating")
 
-        # Format review content
-        message += f"{i}. {snippet}...\n"
+        # Card separator
+        message += "━━━━━━━━━━━━━━━\n"
 
-        # Add metadata line (removed source, keep author and date)
+        # Format review content with quotes
+        message += f'{i}. "{snippet}..."\n\n'
+
+        # Compact metadata line with emojis and pipe separator
         metadata_parts = []
         if author and author != "Anonymous":
-            metadata_parts.append(author)
+            metadata_parts.append(f"👤 {author}")
         if date:
-            metadata_parts.append(date)
+            metadata_parts.append(f"📅 {date}")
         if rating and rating > 0:
-            metadata_parts.append(f"⭐{rating}")
+            metadata_parts.append(f"⭐ {rating}")
 
         if metadata_parts:
-            message += f"   {' • '.join(metadata_parts)}\n"
+            message += f"    {' | '.join(metadata_parts)}\n"
 
-        # Add URL directly (removed emoji prefix)
+        # Add URL with emoji
         if url and len(url) > 10:
-            message += f"   {url}\n"
+            message += f"    🔗 {url}\n"
 
-        message += "\n"
+        message += "━━━━━━━━━━━━━━━\n\n"
 
     # Show count if more reviews available
     if len(reviews) > 8:
