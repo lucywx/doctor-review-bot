@@ -10,7 +10,13 @@
       "Bash(curl:*)",
       "Bash(lsof:*)",
       "Bash(xargs kill:*)",
-      "Read(//Users/lucyy/.cache/**)"
+      "Read(//Users/lucyy/.cache/**)",
+      "Bash(launchctl:*)",
+      "Bash(printenv)",
+      "Read(//etc/**)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

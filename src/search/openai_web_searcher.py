@@ -63,45 +63,16 @@ class OpenAIWebSearcher:
             response = await self.client.responses.create(
                 model="gpt-4o",  # Must use gpt-4o for web_search tool
                 tools=[{"type": "web_search"}],  # Enable web search tool
-                input=f"""Search for REAL patient reviews about Dr {doctor_name} (practicing in Malaysia).
+                input=f"""Search for patient reviews about Dr {doctor_name} practicing in Malaysia.
 
-SEARCH SOURCES (in priority order):
-1. Medical Review Platforms:
-   - LookP.com (Malaysia doctor reviews)
-   - MediSata.com
-   - TalkHealthAsia
-   - Google Maps Malaysia
+Find reviews from Lowyat.net forums, Google Maps, Facebook, medical review sites, or patient blogs.
 
-2. Social Media (PUBLIC posts only):
-   - Facebook (clinic pages, public posts, community groups)
-   - Instagram (public clinic accounts)
+CRITICAL: DO NOT include LookP.com URLs (website is defunct/redirects to spam).
 
-3. Forums & Communities:
-   - Lowyat.net (Malaysia local forum - PRIORITY)
-   - Reddit Malaysia
-   - BabyCenter Malaysia (for ob/gyn, pediatrics)
+Return ONLY JSON array (no explanations):
+[{{"source":"Lowyat.net","snippet":"review text","author_name":"username","review_date":"2023-01-01","rating":null,"url":"https://forum.lowyat.net/..."}}]
 
-4. Patient Blogs/Personal Experiences:
-   - Search: "Dr {doctor_name} experience blog"
-   - Personal blogs sharing medical journey
-   - Medium/Blogspot posts about treatment experience
-
-EXCLUDE:
-✗ Editorial content from health websites (not patient reviews)
-✗ Promotional articles
-✗ News articles about the doctor
-✗ Medical advice articles
-
-OUTPUT REQUIREMENTS (CRITICAL - SYSTEM WILL FAIL IF NOT FOLLOWED):
-1. Return ONLY the JSON array - nothing else
-2. NO introductions (do not write "Here are the reviews...")
-3. NO explanations after the JSON
-4. NO citations or footnotes
-5. NO markdown code blocks (do not wrap in ```)
-6. Start response with [ and end with ]
-
-Format: [{{"source":"LookP","snippet":"review text","rating":null,"author_name":"Name","review_date":"2023-01-01","url":"https://..."}}]
-Empty: []"""
+Each review MUST have a working URL. Better to return fewer reviews with valid URLs than many with broken links."""
             )
 
             logger.info(f"✅ OpenAI API call successful, response type: {type(response)}")
@@ -201,14 +172,36 @@ Empty: []"""
 
                     for review_data in reviews_data:
                         if isinstance(review_data, dict):
-                            # Handle null values properly
+                            # Validate URL first - CRITICAL for avoiding defamation risk
+                            url = review_data.get("url") or ""
+                            source = review_data.get("source", "web_search")
+
+                            # CRITICAL: Skip reviews without valid URLs
+                            # Without URL, we cannot verify the review exists = legal risk
+                            if not url:
+                                logger.warning(f"⚠️ Skipping review from {source}: No URL for verification")
+                                continue
+
+                            # Filter out known broken/defunct domains
+                            broken_domains = [
+                                "lookp.com",  # LookP website is defunct, redirects to spam
+                                "sostalisman.net",  # Spam redirect site
+                            ]
+
+                            is_broken = any(domain in url.lower() for domain in broken_domains)
+
+                            if is_broken:
+                                logger.warning(f"⚠️ Skipping review: Broken/defunct URL: {url}")
+                                continue  # SKIP this review entirely - cannot verify
+
+                            # Only include reviews with valid, verifiable URLs
                             rating = review_data.get("rating")
                             rating = float(rating) if rating is not None else 0.0
 
                             reviews.append({
                                 "doctor_name": doctor_name,
-                                "source": review_data.get("source", "web_search"),
-                                "url": review_data.get("url") or "",
+                                "source": source,
+                                "url": url,
                                 "snippet": review_data.get("snippet", ""),
                                 "rating": rating,
                                 "review_date": review_data.get("review_date") or "",
