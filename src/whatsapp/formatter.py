@@ -35,7 +35,8 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
     display_reviews = sorted_reviews[:8]
 
     for i, review in enumerate(display_reviews, 1):
-        snippet = review.get("snippet", "")[:150]
+        # Limit to ~2 lines on mobile (approx 75 chars)
+        snippet = review.get("snippet", "")[:75]
         author = review.get("author_name", "")
         date = review.get("review_date", "")
         url = review.get("url", "")
