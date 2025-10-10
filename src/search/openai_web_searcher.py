@@ -7,6 +7,8 @@ import logging
 from typing import List, Dict
 from openai import AsyncOpenAI
 from src.config import settings
+import httpx
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +24,38 @@ class OpenAIWebSearcher:
         try:
             self.client = AsyncOpenAI(api_key=settings.openai_api_key)
             self.model = settings.openai_model
+            self.http_client = httpx.AsyncClient(
+                follow_redirects=True,
+                timeout=10.0,
+                verify=False  # Skip SSL verification for redirect checking
+            )
             logger.info(f"🌐 OpenAI Web Searcher initialized (model: {self.model})")
         except Exception as e:
             logger.error(f"❌ OpenAI API initialization failed: {e}")
             raise Exception("OpenAI API key is required for doctor review search")
+
+    async def _check_url_redirect(self, url: str) -> tuple[bool, str]:
+        """
+        Check if URL redirects to a different domain
+        Returns: (is_redirect, final_url)
+        """
+        try:
+            response = await self.http_client.head(url, follow_redirects=True)
+
+            original_domain = urlparse(url).netloc
+            final_domain = urlparse(str(response.url)).netloc
+
+            # Check if domain changed
+            if original_domain != final_domain:
+                logger.warning(f"⚠️ URL redirects: {original_domain} → {final_domain}")
+                return True, str(response.url)
+
+            return False, url
+
+        except Exception as e:
+            logger.warning(f"⚠️ Could not check URL {url}: {e}")
+            # If we can't verify, assume it's broken
+            return True, url
 
     async def search_doctor_reviews(
         self,
@@ -60,19 +90,20 @@ class OpenAIWebSearcher:
             # Use OpenAI Responses API with web search (ChatGPT-like capability)
             logger.info(f"🔍 Calling OpenAI Responses API with query: {search_query}")
             logger.info(f"🤖 Using model: gpt-4o (hardcoded for web_search compatibility)")
+
+            # Let OpenAI find all reviews, we'll validate URLs programmatically
             response = await self.client.responses.create(
                 model="gpt-4o",  # Must use gpt-4o for web_search tool
                 tools=[{"type": "web_search"}],  # Enable web search tool
-                input=f"""Search for patient reviews about Dr {doctor_name} practicing in Malaysia.
+                input=f"""Find patient reviews: "Dr {doctor_name}" Malaysia
 
-Find reviews from Lowyat.net forums, Google Maps, Facebook, medical review sites, or patient blogs.
+Search: Facebook, Lowyat.net, Google Maps, forums, blogs
 
-CRITICAL: DO NOT include LookP.com URLs (website is defunct/redirects to spam).
+Return JSON only:
+[{{"source":"Lowyat.net","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":null,"url":"https://forum.lowyat.net/..."}}]
 
-Return ONLY JSON array (no explanations):
-[{{"source":"Lowyat.net","snippet":"review text","author_name":"username","review_date":"2023-01-01","rating":null,"url":"https://forum.lowyat.net/..."}}]
-
-Each review MUST have a working URL. Better to return fewer reviews with valid URLs than many with broken links."""
+CRITICAL: "url" must be full http/https link (not description)
+Empty if none: []"""
             )
 
             logger.info(f"✅ OpenAI API call successful, response type: {type(response)}")
@@ -83,7 +114,7 @@ Each review MUST have a working URL. Better to return fewer reviews with valid U
                 logger.info(f"📝 Response preview: {output_preview}...")
 
             # Parse response and extract reviews
-            reviews = self._parse_openai_response(response, doctor_name)
+            reviews = await self._parse_openai_response(response, doctor_name)
 
             logger.info(f"✅ Found {len(reviews)} reviews via OpenAI web search")
 
@@ -111,7 +142,7 @@ Each review MUST have a working URL. Better to return fewer reviews with valid U
                 "error": f"Search failed: {str(e)}"
             }
 
-    def _parse_openai_response(self, response, doctor_name: str) -> List[Dict]:
+    async def _parse_openai_response(self, response, doctor_name: str) -> List[Dict]:
         """Parse OpenAI response and extract reviews"""
         try:
             import json
@@ -176,23 +207,21 @@ Each review MUST have a working URL. Better to return fewer reviews with valid U
                             url = review_data.get("url") or ""
                             source = review_data.get("source", "web_search")
 
-                            # CRITICAL: Skip reviews without valid URLs
-                            # Without URL, we cannot verify the review exists = legal risk
-                            if not url:
-                                logger.warning(f"⚠️ Skipping review from {source}: No URL for verification")
+                            # CRITICAL: Validate URL format
+                            # OpenAI sometimes returns descriptions instead of actual URLs
+                            if not url or not url.startswith(("http://", "https://")):
+                                logger.warning(f"⚠️ Skipping review from {source}: Invalid/missing URL: {url[:50] if url else 'None'}")
                                 continue
 
-                            # Filter out known broken/defunct domains
-                            broken_domains = [
-                                "lookp.com",  # LookP website is defunct, redirects to spam
-                                "sostalisman.net",  # Spam redirect site
-                            ]
+                            # CRITICAL: Check if URL redirects to different domain
+                            # This catches defunct sites like LookP that redirect to spam
+                            is_redirect, final_url = await self._check_url_redirect(url)
 
-                            is_broken = any(domain in url.lower() for domain in broken_domains)
-
-                            if is_broken:
-                                logger.warning(f"⚠️ Skipping review: Broken/defunct URL: {url}")
-                                continue  # SKIP this review entirely - cannot verify
+                            if is_redirect:
+                                logger.warning(f"⚠️ Skipping review: URL redirects to different domain")
+                                logger.warning(f"   Original: {url}")
+                                logger.warning(f"   Redirects to: {final_url}")
+                                continue  # SKIP - cannot trust redirected content
 
                             # Only include reviews with valid, verifiable URLs
                             rating = review_data.get("rating")

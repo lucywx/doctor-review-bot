@@ -17,63 +17,49 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
     if not reviews:
         return f"❌ Sorry, no reviews found for *{doctor_name}*.\n\nPlease try:\n• Enter full name\n• Add hospital name\n• Check spelling"
 
-    # Source emojis and names mapping
-    source_emoji = {
-        "google_maps": "🗺️",
-        "google maps": "🗺️",
-        "facebook": "👥",
-        "hospital_website": "🏥",
-        "lookp": "💬",
-        "lowyat": "💬",
-        "forum": "💬",
-        "blog": "📝",
-        "web_search": "🌐",
-        "other": "📄"
-    }
+    # Sort reviews by date (newest first)
+    def parse_date(review):
+        """Extract date for sorting"""
+        date_str = review.get("review_date", "")
+        if not date_str:
+            return "1900-01-01"  # Put undated reviews at end
+        return date_str
 
-    def get_source_emoji(source: str) -> str:
-        """Get emoji for source"""
-        source_lower = source.lower()
-        for key, emoji in source_emoji.items():
-            if key in source_lower:
-                return emoji
-        return "📄"
+    sorted_reviews = sorted(reviews, key=parse_date, reverse=True)
 
     # Build header
     message = f"🔍 *{doctor_name}* Review Summary\n"
     message += f"━━━━━━━━━━━━━━━\n"
-    message += f"📊 Found *{len(reviews)}* reviews\n\n"
+    message += f"📊 Found *{len(sorted_reviews)}* reviews\n\n"
 
     # Show reviews (limit to 8)
-    display_reviews = reviews[:8]
+    display_reviews = sorted_reviews[:8]
 
     for i, review in enumerate(display_reviews, 1):
         snippet = review.get("snippet", "")[:150]
-        source = review.get("source", "Web")
         author = review.get("author_name", "")
         date = review.get("review_date", "")
         url = review.get("url", "")
         rating = review.get("rating")
 
-        # Format review
-        emoji = get_source_emoji(source)
-
+        # Format review content
         message += f"{i}. {snippet}...\n"
 
-        # Add metadata line
-        metadata = f"   {emoji} {source}"
+        # Add metadata line (removed source, keep author and date)
+        metadata_parts = []
         if author and author != "Anonymous":
-            metadata += f" • {author}"
+            metadata_parts.append(author)
         if date:
-            metadata += f" • {date}"
+            metadata_parts.append(date)
         if rating and rating > 0:
-            metadata += f" • ⭐{rating}"
+            metadata_parts.append(f"⭐{rating}")
 
-        message += f"{metadata}\n"
+        if metadata_parts:
+            message += f"   {' • '.join(metadata_parts)}\n"
 
-        # Add source link if available
+        # Add URL directly (removed emoji prefix)
         if url and len(url) > 10:
-            message += f"   🔗 {url}\n"
+            message += f"   {url}\n"
 
         message += "\n"
 
