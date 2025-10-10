@@ -7,8 +7,6 @@ import logging
 from typing import List, Dict
 from openai import AsyncOpenAI
 from src.config import settings
-import httpx
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -24,38 +22,30 @@ class OpenAIWebSearcher:
         try:
             self.client = AsyncOpenAI(api_key=settings.openai_api_key)
             self.model = settings.openai_model
-            self.http_client = httpx.AsyncClient(
-                follow_redirects=True,
-                timeout=10.0,
-                verify=False  # Skip SSL verification for redirect checking
-            )
             logger.info(f"🌐 OpenAI Web Searcher initialized (model: {self.model})")
         except Exception as e:
             logger.error(f"❌ OpenAI API initialization failed: {e}")
             raise Exception("OpenAI API key is required for doctor review search")
 
-    async def _check_url_redirect(self, url: str) -> tuple[bool, str]:
+    def _is_blacklisted_domain(self, url: str) -> bool:
         """
-        Check if URL redirects to a different domain
-        Returns: (is_redirect, final_url)
+        Check if URL is from a known defunct/spam domain
+        Fast check without HTTP requests
         """
-        try:
-            response = await self.http_client.head(url, follow_redirects=True)
+        # Known defunct domains that redirect to spam
+        blacklisted_domains = [
+            "lookp.com",           # Redirects to sostalisman.net
+            "sostalisman.net",     # Spam site
+            "wedresearch.com",     # Often unreliable
+        ]
 
-            original_domain = urlparse(url).netloc
-            final_domain = urlparse(str(response.url)).netloc
+        url_lower = url.lower()
+        for domain in blacklisted_domains:
+            if domain in url_lower:
+                logger.warning(f"⚠️ Blacklisted domain detected: {domain} in {url}")
+                return True
 
-            # Check if domain changed
-            if original_domain != final_domain:
-                logger.warning(f"⚠️ URL redirects: {original_domain} → {final_domain}")
-                return True, str(response.url)
-
-            return False, url
-
-        except Exception as e:
-            logger.warning(f"⚠️ Could not check URL {url}: {e}")
-            # If we can't verify, assume it's broken
-            return True, url
+        return False
 
     async def search_doctor_reviews(
         self,
@@ -213,15 +203,11 @@ Empty if none: []"""
                                 logger.warning(f"⚠️ Skipping review from {source}: Invalid/missing URL: {url[:50] if url else 'None'}")
                                 continue
 
-                            # CRITICAL: Check if URL redirects to different domain
-                            # This catches defunct sites like LookP that redirect to spam
-                            is_redirect, final_url = await self._check_url_redirect(url)
-
-                            if is_redirect:
-                                logger.warning(f"⚠️ Skipping review: URL redirects to different domain")
-                                logger.warning(f"   Original: {url}")
-                                logger.warning(f"   Redirects to: {final_url}")
-                                continue  # SKIP - cannot trust redirected content
+                            # CRITICAL: Check if URL is from blacklisted domain
+                            # Fast domain check without HTTP requests (prevents timeout issues)
+                            if self._is_blacklisted_domain(url):
+                                logger.warning(f"⚠️ Skipping review from blacklisted domain: {url}")
+                                continue  # SKIP - known defunct/spam domain
 
                             # Only include reviews with valid, verifiable URLs
                             rating = review_data.get("rating")
