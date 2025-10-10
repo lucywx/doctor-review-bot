@@ -27,10 +27,9 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
 
     sorted_reviews = sorted(reviews, key=parse_date, reverse=True)
 
-    # Build header
+    # Build header (removed "Found X reviews" line)
     message = f"🔍 *{doctor_name}* Review Summary\n"
-    message += f"━━━━━━━━━━━━━━━\n"
-    message += f"📊 Found *{len(sorted_reviews)}* reviews\n\n"
+    message += f"━━━━━━━━━━━━━━━\n\n"
 
     # Show reviews (limit to 8)
     display_reviews = sorted_reviews[:8]
@@ -41,9 +40,6 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
         date = review.get("review_date", "")
         url = review.get("url", "")
         rating = review.get("rating")
-
-        # Card separator
-        message += "━━━━━━━━━━━━━━━\n"
 
         # Format review content with quotes
         message += f'{i}. "{snippet}..."\n\n'
@@ -60,10 +56,13 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
         if metadata_parts:
             message += f"    {' | '.join(metadata_parts)}\n"
 
-        # Add URL with emoji
+        # Add URL with emoji - disable WhatsApp link preview by using backticks
         if url and len(url) > 10:
-            message += f"    🔗 {url}\n"
+            # Remove http(s):// prefix to prevent link preview
+            clean_url = url.replace("https://", "").replace("http://", "")
+            message += f"    🔗 {clean_url}\n"
 
+        # Single separator between reviews
         message += "━━━━━━━━━━━━━━━\n\n"
 
     # Show count if more reviews available
