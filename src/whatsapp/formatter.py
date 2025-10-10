@@ -27,9 +27,8 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
 
     sorted_reviews = sorted(reviews, key=parse_date, reverse=True)
 
-    # Build header (removed "Found X reviews" line)
-    message = f"🔍 *{doctor_name}* Review Summary\n"
-    message += f"━━━━━━━━━━━━━━━\n\n"
+    # Build header
+    message = f"🔍 *{doctor_name}* Review Summary\n\n"
 
     # Show reviews (limit to 8)
     display_reviews = sorted_reviews[:8]
@@ -43,7 +42,7 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
         rating = review.get("rating")
 
         # Format review content with quotes
-        message += f'{i}. "{snippet}..."\n\n'
+        message += f'{i}. "{snippet}..."\n'
 
         # Compact metadata line with emojis and pipe separator
         metadata_parts = []
@@ -57,14 +56,14 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
         if metadata_parts:
             message += f"    {' | '.join(metadata_parts)}\n"
 
-        # Add URL with emoji - disable WhatsApp link preview by using backticks
+        # Add URL with emoji - disable WhatsApp link preview
         if url and len(url) > 10:
             # Remove http(s):// prefix to prevent link preview
             clean_url = url.replace("https://", "").replace("http://", "")
             message += f"    🔗 {clean_url}\n"
 
-        # Single separator between reviews
-        message += "━━━━━━━━━━━━━━━\n\n"
+        # Empty line between reviews
+        message += "\n"
 
     # Show count if more reviews available
     if len(reviews) > 8:
