@@ -59,8 +59,9 @@ class OpenAIWebSearcher:
             
             # Use OpenAI Responses API with web search (ChatGPT-like capability)
             logger.info(f"🔍 Calling OpenAI Responses API with query: {search_query}")
+            logger.info(f"🤖 Using model: gpt-4o (hardcoded for web_search compatibility)")
             response = await self.client.responses.create(
-                model="gpt-4o",  # Use gpt-4o model for web search
+                model="gpt-4o",  # Must use gpt-4o for web_search tool
                 tools=[{"type": "web_search"}],  # Enable web search tool
                 input=f"""Search for REAL patient reviews about Dr {doctor_name} (practicing in Malaysia).
 
@@ -105,10 +106,19 @@ Empty: []"""
 
             logger.info(f"✅ OpenAI API call successful, response type: {type(response)}")
 
+            # Log raw response for debugging
+            if hasattr(response, 'output_text'):
+                output_preview = response.output_text[:300] if response.output_text else "EMPTY"
+                logger.info(f"📝 Response preview: {output_preview}...")
+
             # Parse response and extract reviews
             reviews = self._parse_openai_response(response, doctor_name)
-            
+
             logger.info(f"✅ Found {len(reviews)} reviews via OpenAI web search")
+
+            if len(reviews) == 0:
+                logger.warning("⚠️ WARNING: 0 reviews found - this might indicate an issue")
+                logger.warning(f"⚠️ Response output_text length: {len(response.output_text) if hasattr(response, 'output_text') else 'N/A'}")
             
             return {
                 "doctor_name": doctor_name,
@@ -139,21 +149,25 @@ Empty: []"""
             # The Responses API returns output_text attribute
             if hasattr(response, 'output_text'):
                 content = response.output_text.strip()
+                logger.info(f"📝 Extracted from output_text, length: {len(content)}")
             elif hasattr(response, 'output') and isinstance(response.output, list):
                 # Try to get text from output array
                 content = ""
                 for item in response.output:
                     if hasattr(item, 'text'):
                         content += item.text
+                logger.info(f"📝 Extracted from output array, length: {len(content)}")
             elif hasattr(response, 'choices'):
                 # Fallback for Chat Completions API format
                 content = response.choices[0].message.content.strip()
+                logger.info(f"📝 Extracted from choices, length: {len(content)}")
             else:
-                logger.warning(f"Unknown response format: {type(response)}")
-                logger.debug(f"Response attributes: {dir(response)}")
+                logger.warning(f"⚠️ Unknown response format: {type(response)}")
+                logger.warning(f"⚠️ Response attributes: {dir(response)}")
                 content = str(response).strip()
 
-            logger.info(f"📝 OpenAI response: {content[:200]}...")
+            logger.info(f"📝 Content preview: {content[:200]}...")
+            logger.info(f"📝 Content ends with: ...{content[-100:]}" if len(content) > 100 else f"📝 Full content: {content}")
 
             # Try to extract JSON from response
             json_content = None
