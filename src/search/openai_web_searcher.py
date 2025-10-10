@@ -7,6 +7,9 @@ import logging
 from typing import List, Dict
 from openai import AsyncOpenAI
 from src.config import settings
+import httpx
+import asyncio
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,12 @@ class OpenAIWebSearcher:
         try:
             self.client = AsyncOpenAI(api_key=settings.openai_api_key)
             self.model = settings.openai_model
+            # HTTP client for fast URL validation (2s timeout)
+            self.http_client = httpx.AsyncClient(
+                follow_redirects=True,
+                timeout=2.0,  # Fast timeout to prevent delays
+                verify=False  # Skip SSL verification for speed
+            )
             logger.info(f"🌐 OpenAI Web Searcher initialized (model: {self.model})")
         except Exception as e:
             logger.error(f"❌ OpenAI API initialization failed: {e}")
@@ -46,6 +55,63 @@ class OpenAIWebSearcher:
                 return True
 
         return False
+
+    async def _check_single_url(self, url: str) -> tuple[bool, str]:
+        """
+        Fast check if single URL redirects to different domain
+        Returns: (is_valid, final_url)
+        """
+        try:
+            # Quick HEAD request with 2s timeout
+            response = await self.http_client.head(url, follow_redirects=True)
+
+            original_domain = urlparse(url).netloc
+            final_domain = urlparse(str(response.url)).netloc
+
+            # Check if domain changed
+            if original_domain != final_domain:
+                logger.warning(f"⚠️ URL redirects: {original_domain} → {final_domain}")
+                return False, str(response.url)
+
+            return True, url
+
+        except asyncio.TimeoutError:
+            logger.warning(f"⚠️ URL timeout (2s): {url}")
+            return False, url
+        except Exception as e:
+            logger.warning(f"⚠️ URL check failed: {url} - {e}")
+            return False, url
+
+    async def _validate_urls_batch(self, review_list: list) -> list:
+        """
+        Validate multiple URLs concurrently
+        Returns: filtered list with only valid URLs
+        """
+        # Extract URLs
+        urls_to_check = []
+        for review in review_list:
+            url = review.get("url", "")
+            if url and url.startswith(("http://", "https://")):
+                urls_to_check.append((review, url))
+
+        if not urls_to_check:
+            return review_list
+
+        # Concurrent validation
+        logger.info(f"🔍 Validating {len(urls_to_check)} URLs concurrently...")
+        tasks = [self._check_single_url(url) for _, url in urls_to_check]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter valid reviews
+        valid_reviews = []
+        for (review, url), result in zip(urls_to_check, results):
+            if isinstance(result, tuple) and result[0]:  # is_valid = True
+                valid_reviews.append(review)
+            else:
+                logger.warning(f"⚠️ Filtered out review with invalid URL: {url}")
+
+        logger.info(f"✅ {len(valid_reviews)}/{len(urls_to_check)} URLs are valid")
+        return valid_reviews
 
     async def search_doctor_reviews(
         self,
@@ -203,13 +269,12 @@ Empty if none: []"""
                                 logger.warning(f"⚠️ Skipping review from {source}: Invalid/missing URL: {url[:50] if url else 'None'}")
                                 continue
 
-                            # CRITICAL: Check if URL is from blacklisted domain
-                            # Fast domain check without HTTP requests (prevents timeout issues)
+                            # Step 1: Fast blacklist check (0ms)
                             if self._is_blacklisted_domain(url):
                                 logger.warning(f"⚠️ Skipping review from blacklisted domain: {url}")
                                 continue  # SKIP - known defunct/spam domain
 
-                            # Only include reviews with valid, verifiable URLs
+                            # Collect review for batch validation
                             rating = review_data.get("rating")
                             rating = float(rating) if rating is not None else 0.0
 
@@ -224,7 +289,14 @@ Empty if none: []"""
                                 "sentiment": None  # Will be analyzed later
                             })
 
-                    logger.info(f"✅ Parsed {len(reviews)} reviews from JSON")
+                    logger.info(f"✅ Parsed {len(reviews)} reviews from JSON (after blacklist)")
+
+                    # Step 2: Batch validate URLs concurrently (2s timeout per URL, all parallel)
+                    if reviews:
+                        logger.info(f"🔍 Starting batch URL validation for {len(reviews)} reviews...")
+                        reviews = await self._validate_urls_batch(reviews)
+                        logger.info(f"✅ After validation: {len(reviews)} reviews remain")
+
                     return reviews
 
                 except json.JSONDecodeError as e:
