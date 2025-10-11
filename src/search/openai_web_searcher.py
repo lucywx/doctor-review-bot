@@ -145,11 +145,11 @@ class OpenAIWebSearcher:
             
             # Use OpenAI Responses API with web search (ChatGPT-like capability)
             logger.info(f"🔍 Calling OpenAI Responses API with query: {search_query}")
-            logger.info(f"🤖 Using model: gpt-4o (hardcoded for web_search compatibility)")
+            logger.info(f"🤖 Using model: gpt-4o-mini (web_search compatible, 16.7x cheaper)")
 
             # Let OpenAI find all reviews, we'll validate URLs programmatically
             response = await self.client.responses.create(
-                model="gpt-4o",  # Must use gpt-4o for web_search tool
+                model="gpt-4o-mini",  # Cost: $0.15/1M input (vs $2.50 for gpt-4o)
                 tools=[{"type": "web_search"}],  # Enable web search tool
                 input=f"""Find patient reviews for: "Dr {doctor_name}"
 
