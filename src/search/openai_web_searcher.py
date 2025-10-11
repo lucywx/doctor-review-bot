@@ -36,6 +36,58 @@ class OpenAIWebSearcher:
             logger.error(f"❌ OpenAI API initialization failed: {e}")
             raise Exception("OpenAI API key is required for doctor review search")
 
+    def _extract_specialty_keywords(self, specialty: str) -> str:
+        """
+        Extract flexible keywords from specialty for fuzzy matching
+
+        Examples:
+        - "Obstetrics & Gynaecology" → "obstetric, gynaecolog, gynecolog, ob/gyn, o&g"
+        - "Ear, Nose & Throat (ENT)" → "ENT, ear nose throat, otolaryngology"
+        - "Cardiology" → "cardiology, cardiologist, heart"
+
+        Args:
+            specialty: Full specialty name
+
+        Returns:
+            Comma-separated keywords for flexible search
+        """
+        specialty_lower = specialty.lower()
+        keywords = []
+
+        # Specialty-specific keyword mappings
+        specialty_map = {
+            "obstetrics & gynaecology": ["obstetric", "gynaecolog", "gynecolog", "ob/gyn", "o&g", "obgyn"],
+            "ear, nose & throat": ["ENT", "ear nose throat", "otolaryngology", "ent specialist"],
+            "cardiology": ["cardiology", "cardiologist", "heart"],
+            "dermatology": ["dermatology", "dermatologist", "skin"],
+            "gastroenterology & hepatology": ["gastro", "GI", "digestive", "liver"],
+            "general surgery": ["surgeon", "surgery", "surgical"],
+            "ophthalmology": ["ophthalmology", "eye", "vision"],
+            "orthopaedic surgery": ["ortho", "orthopedic", "bone", "joint"],
+            "paediatrics": ["pediatric", "paediatric", "children", "kids"],
+            "psychiatry": ["psychiatry", "mental health", "psychiatrist"],
+            "neurology": ["neurology", "neurologist", "brain", "nerve"],
+            "oncology": ["oncology", "cancer", "oncologist"],
+        }
+
+        # Check for direct match in map
+        for key, values in specialty_map.items():
+            if key in specialty_lower:
+                keywords.extend(values)
+                break
+
+        # If no match, use the specialty itself plus common variations
+        if not keywords:
+            # Add the original specialty
+            keywords.append(specialty)
+
+            # Add without special characters
+            cleaned = specialty_lower.replace("&", "").replace(",", "").strip()
+            if cleaned != specialty_lower:
+                keywords.append(cleaned)
+
+        return ", ".join(keywords[:5])  # Limit to 5 keywords
+
     def _is_blacklisted_domain(self, url: str) -> bool:
         """
         Check if URL is from a known defunct/spam domain
@@ -134,26 +186,33 @@ class OpenAIWebSearcher:
             # CRITICAL: Never use mock data for doctor reviews
             logger.info(f"🌐 Searching web for: {doctor_name}")
             
-            # Build search query
-            query_parts = [doctor_name]
+            # Build search instructions with flexible specialty matching
+            specialty_hint = ""
             if specialty:
-                query_parts.append(specialty)
-            if location:
-                query_parts.append(location)
-            
-            search_query = " ".join(query_parts) + " doctor reviews patient feedback"
-            
+                # Extract key terms from specialty for flexible matching
+                # e.g., "Obstetrics & Gynaecology" → search for "obstetric OR gynaecolog OR gynecolog OR ob/gyn"
+                specialty_keywords = self._extract_specialty_keywords(specialty)
+                specialty_hint = f"\nSpecialty context (use flexibly): {specialty_keywords}"
+                logger.info(f"🔍 Specialty keywords: {specialty_keywords}")
+
+            location_hint = f"\nLocation: {location}" if location else ""
+
             # Use OpenAI Responses API with web search (ChatGPT-like capability)
-            logger.info(f"🔍 Calling OpenAI Responses API with query: {search_query}")
+            logger.info(f"🔍 Calling OpenAI Responses API for: {doctor_name}")
             logger.info(f"🤖 Using model: gpt-4o-mini (web_search compatible, 16.7x cheaper)")
 
             # Let OpenAI find all reviews, we'll validate URLs programmatically
             response = await self.client.responses.create(
                 model="gpt-4o-mini",  # Cost: $0.15/1M input (vs $2.50 for gpt-4o)
                 tools=[{"type": "web_search"}],  # Enable web search tool
-                input=f"""Find patient reviews for: "Dr {doctor_name}"
+                input=f"""Find patient reviews for: "Dr {doctor_name}"{specialty_hint}{location_hint}
 
 Search globally: Google Maps, Facebook, Yelp, Healthgrades, RateMDs, Zocdoc, forums, blogs, review sites
+
+IMPORTANT:
+- Prioritize reviews matching the specialty if provided, but also include other reviews
+- Use flexible matching (e.g., "gynae", "gynaecology", "ob/gyn" all match)
+- Return ALL relevant reviews for this doctor
 
 Return JSON only:
 [{{"source":"Google Maps","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":4.5,"url":"https://maps.google.com/..."}}]
