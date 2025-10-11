@@ -177,9 +177,6 @@ def format_specialty_selection(doctor_name: str, show_full: bool = True) -> str:
     ]
 
     specialties_text = "\n".join(all_specialties)
-    return f"""📋 *{doctor_name} - Select Specialty*
+    return f"""📋 *{doctor_name} - Select specialty by number*
 
-{specialties_text}
-
-Reply with number or name
-_(0 = skip)_"""
+{specialties_text}"""
