@@ -16,7 +16,8 @@
       "Read(//etc/**)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(brew install:*)"
     ],
     "deny": [],
     "ask": []

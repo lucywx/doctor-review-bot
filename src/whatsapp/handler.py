@@ -170,8 +170,10 @@ You'll be able to use the bot once approved."""
                 await whatsapp_client.send_message(from_number, response)
                 return
 
-            # Extract doctor name
-            doctor_name = self._extract_doctor_name(message_text)
+            # Extract doctor name and specialty
+            doctor_info = self._extract_doctor_info(message_text)
+            doctor_name = doctor_info.get("name")
+            specialty = doctor_info.get("specialty", "")
 
             if not doctor_name:
                 response = format_error_message("invalid_input")
@@ -189,7 +191,7 @@ You'll be able to use the bot once approved."""
             start_time = time.time()
 
             # Search for doctor reviews
-            reviews = await self._search_doctor_reviews(doctor_name)
+            reviews = await self._search_doctor_reviews(doctor_name, specialty)
 
             # Calculate response time
             response_time_ms = int((time.time() - start_time) * 1000)
@@ -225,43 +227,96 @@ You'll be able to use the bot once approved."""
                 format_error_message("general")
             )
 
-    def _extract_doctor_name(self, text: str) -> str:
+    def _extract_doctor_info(self, text: str) -> dict:
         """
-        Extract doctor name from user input
+        Extract doctor name and specialty from user input
+
+        Supported formats:
+        1. "Dr Smith, Cardiology"
+        2. "Dr Smith | Cardiology"
+        3. "Dr Smith - Cardiology"
+        4. "Dr Smith Cardiology"
+        5. "Dr Smith"
 
         Args:
             text: User input text
 
         Returns:
-            Extracted doctor name
+            Dict with 'name' and 'specialty' keys
         """
-        # Simple extraction for now
-        # Remove common words
-        text = text.replace("doctor", "").replace("dr", "").replace("dr.", "").strip()
+        # List of common medical specialties (English)
+        SPECIALTIES = [
+            "cardiology", "dermatology", "endocrinology", "gastroenterology",
+            "gynecology", "hematology", "neurology", "obstetrics", "oncology",
+            "ophthalmology", "orthopedics", "pediatrics", "psychiatry",
+            "radiology", "surgery", "urology", "anesthesiology", "pathology",
+            "plastic surgery", "emergency medicine", "family medicine",
+            "internal medicine", "general practice", "gp"
+        ]
 
-        # TODO: Add more sophisticated name extraction logic
-        # - Handle titles (Dr., Prof., etc.)
-        # - Extract hospital name separately
-        # - Handle location
+        # Normalize input
+        text = text.lower().strip()
 
-        return text if len(text) > 0 else ""
+        # Remove common prefixes
+        for prefix in ["doctor", "dr.", "dr", "prof.", "prof"]:
+            if text.startswith(prefix):
+                text = text[len(prefix):].strip()
 
-    async def _search_doctor_reviews(self, doctor_name: str) -> list:
+        specialty = ""
+        doctor_name = text
+
+        # Try to extract specialty using delimiters
+        for delimiter in [",", "|", "-", "/"]:
+            if delimiter in text:
+                parts = text.split(delimiter, 1)
+                doctor_name = parts[0].strip()
+                potential_specialty = parts[1].strip()
+
+                # Check if it's a known specialty
+                if any(spec in potential_specialty for spec in SPECIALTIES):
+                    specialty = potential_specialty
+                    break
+
+        # If no delimiter, try to find specialty in text
+        if not specialty:
+            for spec in SPECIALTIES:
+                if spec in text:
+                    # Found specialty in text
+                    doctor_name = text.replace(spec, "").strip()
+                    specialty = spec
+                    break
+
+        # Clean up doctor name
+        doctor_name = doctor_name.strip()
+
+        return {
+            "name": doctor_name if doctor_name else "",
+            "specialty": specialty
+        }
+
+    async def _search_doctor_reviews(self, doctor_name: str, specialty: str = "") -> list:
         """
         Search for doctor reviews using real search engines
 
         Args:
             doctor_name: Doctor's name
+            specialty: Optional medical specialty
 
         Returns:
             List of review dicts
         """
         from src.search.aggregator import search_aggregator
 
-        logger.info(f"🔍 Searching for reviews: {doctor_name}")
+        if specialty:
+            logger.info(f"🔍 Searching for reviews: {doctor_name} ({specialty})")
+        else:
+            logger.info(f"🔍 Searching for reviews: {doctor_name}")
 
-        # Use search aggregator
-        result = await search_aggregator.search_doctor_reviews(doctor_name)
+        # Use search aggregator with specialty
+        result = await search_aggregator.search_doctor_reviews(
+            doctor_name=doctor_name,
+            specialty=specialty
+        )
 
         return result.get("reviews", [])
 
