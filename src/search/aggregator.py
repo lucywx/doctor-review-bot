@@ -63,6 +63,19 @@ class SearchAggregator:
 
             all_reviews = search_result.get("reviews", [])
 
+            # Step 2.5: Fallback - if no results with specialty, try without specialty
+            if not all_reviews and specialty:
+                logger.warning(f"⚠️ No results with specialty '{specialty}', retrying without it...")
+                search_result = await openai_web_searcher.search_doctor_reviews(
+                    doctor_name=doctor_name,
+                    specialty="",  # Remove specialty
+                    location=location
+                )
+                all_reviews = search_result.get("reviews", [])
+
+                if all_reviews:
+                    logger.info(f"✅ Found {len(all_reviews)} reviews without specialty filter")
+
             if not all_reviews:
                 logger.info(f"❌ No reviews found for {doctor_name}")
                 return {
