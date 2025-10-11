@@ -120,3 +120,42 @@ def format_error_message(error_type: str = "general") -> str:
 def format_processing_message() -> str:
     """Message shown while processing"""
     return "🔍 Searching... it takes 15-30 seconds"
+
+
+def format_specialty_selection(doctor_name: str) -> str:
+    """
+    Format specialty selection menu
+
+    Args:
+        doctor_name: Doctor's name
+
+    Returns:
+        Formatted specialty selection message
+    """
+    return f"""📋 *Select Specialty for {doctor_name}*
+
+Please reply with the specialty number or name:
+
+*Common Specialties:*
+1️⃣ Cardiology (Heart)
+2️⃣ Dermatology (Skin)
+3️⃣ Pediatrics (Children)
+4️⃣ Orthopedics (Bones)
+5️⃣ Gynecology (Women)
+6️⃣ Oncology (Cancer)
+7️⃣ Psychiatry (Mental Health)
+8️⃣ Neurology (Brain)
+9️⃣ Gastroenterology (Digestive)
+🔟 Surgery
+
+*More Specialties:*
+• Endocrinology • Hematology
+• Obstetrics • Ophthalmology
+• Radiology • Urology
+• Anesthesiology • Pathology
+
+💡 *Tips:*
+• Reply with number (e.g., `1`) or name (e.g., `Cardiology`)
+• Or reply `0` to skip specialty
+
+⏰ Session expires in 5 minutes"""

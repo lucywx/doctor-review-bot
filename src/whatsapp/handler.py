@@ -8,7 +8,8 @@ from src.whatsapp.client_mock import whatsapp_client
 from src.whatsapp.formatter import (
     format_welcome_message,
     format_error_message,
-    format_processing_message
+    format_processing_message,
+    format_specialty_selection
 )
 
 logger = logging.getLogger(__name__)
@@ -161,16 +162,33 @@ You'll be able to use the bot once approved."""
                 await whatsapp_client.send_message(from_number, response)
                 return
 
-            # Check user quota
-            from src.models.user import user_quota_manager
-            quota_status = await user_quota_manager.check_and_update_quota(from_number)
+            # Check if user has a pending specialty selection
+            from src.models.user_session import user_session_manager
+            pending_search = user_session_manager.get_pending_search(from_number)
 
-            if not quota_status.get("allowed", True):
-                response = format_error_message("quota_exceeded")
-                await whatsapp_client.send_message(from_number, response)
+            if pending_search:
+                # User is replying with specialty selection
+                specialty = self._parse_specialty_input(message_text)
+                doctor_name = pending_search["doctor_name"]
+
+                # Complete the session
+                user_session_manager.complete_search(from_number)
+
+                # Check user quota
+                from src.models.user import user_quota_manager
+                quota_status = await user_quota_manager.check_and_update_quota(from_number)
+
+                if not quota_status.get("allowed", True):
+                    response = format_error_message("quota_exceeded")
+                    await whatsapp_client.send_message(from_number, response)
+                    return
+
+                # Proceed to search with specialty
+                await self._perform_search(from_number, doctor_name, specialty)
                 return
 
-            # Extract doctor name and specialty
+            # No pending search - check if user provided complete input
+            # Try to extract both name and specialty from message
             doctor_info = self._extract_doctor_info(message_text)
             doctor_name = doctor_info.get("name")
             specialty = doctor_info.get("specialty", "")
@@ -180,6 +198,102 @@ You'll be able to use the bot once approved."""
                 await whatsapp_client.send_message(from_number, response)
                 return
 
+            # Check user quota
+            from src.models.user import user_quota_manager
+            quota_status = await user_quota_manager.check_and_update_quota(from_number)
+
+            if not quota_status.get("allowed", True):
+                response = format_error_message("quota_exceeded")
+                await whatsapp_client.send_message(from_number, response)
+                return
+
+            # If specialty provided, search immediately
+            if specialty:
+                await self._perform_search(from_number, doctor_name, specialty)
+                return
+
+            # No specialty - ask user to select one
+            user_session_manager.create_pending_search(from_number, doctor_name)
+            selection_menu = format_specialty_selection(doctor_name)
+            await whatsapp_client.send_message(from_number, selection_menu)
+            return
+
+        except Exception as e:
+            logger.error(f"❌ Error processing message: {e}", exc_info=True)
+            await whatsapp_client.send_message(
+                from_number,
+                format_error_message("general")
+            )
+
+    def _parse_specialty_input(self, text: str) -> str:
+        """
+        Parse specialty from user's selection response
+
+        Handles:
+        - Number selection (1-10)
+        - Specialty name
+        - 0 or "skip" to skip specialty
+
+        Args:
+            text: User's response
+
+        Returns:
+            Specialty name or empty string if skipped
+        """
+        text = text.strip().lower()
+
+        # Specialty number mapping
+        SPECIALTY_MAP = {
+            "1": "cardiology",
+            "2": "dermatology",
+            "3": "pediatrics",
+            "4": "orthopedics",
+            "5": "gynecology",
+            "6": "oncology",
+            "7": "psychiatry",
+            "8": "neurology",
+            "9": "gastroenterology",
+            "10": "surgery"
+        }
+
+        # Check if user wants to skip
+        if text in ["0", "skip", "no", "none", "cancel"]:
+            logger.info("User chose to skip specialty selection")
+            return ""
+
+        # Check if it's a number
+        if text in SPECIALTY_MAP:
+            specialty = SPECIALTY_MAP[text]
+            logger.info(f"User selected specialty by number: {text} → {specialty}")
+            return specialty
+
+        # Otherwise treat as specialty name
+        SPECIALTIES = [
+            "cardiology", "dermatology", "endocrinology", "gastroenterology",
+            "gynecology", "hematology", "neurology", "obstetrics", "oncology",
+            "ophthalmology", "orthopedics", "pediatrics", "psychiatry",
+            "radiology", "surgery", "urology", "anesthesiology", "pathology"
+        ]
+
+        for specialty in SPECIALTIES:
+            if specialty in text:
+                logger.info(f"User selected specialty by name: {specialty}")
+                return specialty
+
+        # If no match, return as-is (let OpenAI handle it)
+        logger.info(f"User input not recognized, using as-is: {text}")
+        return text
+
+    async def _perform_search(self, from_number: str, doctor_name: str, specialty: str = ""):
+        """
+        Perform doctor review search and send results
+
+        Args:
+            from_number: User's phone number
+            doctor_name: Doctor's name
+            specialty: Optional specialty
+        """
+        try:
             # Send processing message
             await whatsapp_client.send_message(
                 from_number,
@@ -205,11 +319,11 @@ You'll be able to use the bot once approved."""
                 user_id=from_number,
                 doctor_name=doctor_name,
                 doctor_id=doctor_id,
-                cache_hit=len(reviews) > 0 and response_time_ms < 500,  # Heuristic
+                cache_hit=len(reviews) > 0 and response_time_ms < 500,
                 response_time_ms=response_time_ms,
                 sources_used=list(set([r.get("source") for r in reviews if r.get("source")])),
                 results_count=len(reviews),
-                api_calls_count=0 if response_time_ms < 500 else 2,  # Estimate
+                api_calls_count=0 if response_time_ms < 500 else 2,
                 estimated_cost_usd=0.0 if response_time_ms < 500 else 0.01
             )
 
@@ -221,7 +335,7 @@ You'll be able to use the bot once approved."""
             )
 
         except Exception as e:
-            logger.error(f"❌ Error processing message: {e}", exc_info=True)
+            logger.error(f"❌ Error performing search: {e}", exc_info=True)
             await whatsapp_client.send_message(
                 from_number,
                 format_error_message("general")
