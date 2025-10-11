@@ -27,14 +27,10 @@ async def lifespan(app: FastAPI):
     logger.info(f"Debug mode: {settings.debug}")
 
     try:
-        # Choose database based on environment
-        if settings.environment == "production":
-            from src.database import db
-            logger.info("📊 Using PostgreSQL database")
-        else:
-            from src.database_sqlite import db
-            logger.info("📊 Using SQLite database")
-        
+        # Always use PostgreSQL
+        from src.database import db
+        logger.info("📊 Using PostgreSQL database")
+
         # Connect to database
         await db.connect()
         logger.info("✅ Database connected")
@@ -94,12 +90,9 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     try:
-        # Choose database based on environment
-        if settings.environment == "production":
-            from src.database import db
-        else:
-            from src.database_sqlite import db
-        
+        # Always use PostgreSQL
+        from src.database import db
+
         # Check database connection
         await db.fetchval("SELECT 1")
 
