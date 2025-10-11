@@ -122,20 +122,20 @@ def format_processing_message() -> str:
     return "🔍 Searching... it takes 15-30 seconds"
 
 
-def format_specialty_selection(doctor_name: str, show_full: bool = False) -> str:
+def format_specialty_selection(doctor_name: str, show_full: bool = True) -> str:
     """
-    Format specialty selection menu with expandable options
+    Format specialty selection menu with all 38 specialties
 
     Args:
         doctor_name: Doctor's name
-        show_full: If True, show all 38 specialties; if False, show top 10
+        show_full: Kept for backward compatibility (always shows full list)
 
     Returns:
         Formatted specialty selection message
     """
 
-    # Top 10 most common specialties
-    top_specialties = [
+    # All 38 specialties
+    all_specialties = [
         "1. Cardiology",
         "2. Dermatology",
         "3. Endocrinology & Diabetes",
@@ -145,11 +145,7 @@ def format_specialty_selection(doctor_name: str, show_full: bool = False) -> str
         "7. Oncology",
         "8. Ophthalmology",
         "9. Orthopaedic Surgery",
-        "10. Paediatrics"
-    ]
-
-    # All 38 specialties (excluding top 10)
-    additional_specialties = [
+        "10. Paediatrics",
         "11. Anaesthesiology & Critical Care",
         "12. Cardiothoracic Surgery",
         "13. Dentistry",
@@ -180,23 +176,10 @@ def format_specialty_selection(doctor_name: str, show_full: bool = False) -> str
         "38. Other"
     ]
 
-    if show_full:
-        # Show all 38 specialties
-        all_specialties = "\n".join(top_specialties + additional_specialties)
-        return f"""📋 *{doctor_name} - All Specialties*
+    specialties_text = "\n".join(all_specialties)
+    return f"""📋 *{doctor_name} - Select Specialty*
 
-{all_specialties}
+{specialties_text}
 
 Reply with number or name
-_(0 = skip)_"""
-    else:
-        # Show only top 10 + expansion option
-        top_list = "\n".join(top_specialties)
-        return f"""📋 *{doctor_name} - Select Specialty*
-
-{top_list}
-
-... _28 more_
-
-Reply number or `...` for full list
 _(0 = skip)_"""

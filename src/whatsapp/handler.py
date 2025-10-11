@@ -167,15 +167,6 @@ You'll be able to use the bot once approved."""
             pending_search = user_session_manager.get_pending_search(from_number)
 
             if pending_search:
-                # Check if user wants to expand the menu
-                if message_text.strip().lower() in ["...", "more", "show more", "see all", "all"]:
-                    # User wants to see full specialty list
-                    user_session_manager.expand_menu(from_number)
-                    doctor_name = pending_search["doctor_name"]
-                    full_menu = format_specialty_selection(doctor_name, show_full=True)
-                    await whatsapp_client.send_message(from_number, full_menu)
-                    return  # Keep session active, wait for actual selection
-
                 # User is replying with specialty selection
                 specialty = self._parse_specialty_input(message_text)
                 doctor_name = pending_search["doctor_name"]
@@ -221,9 +212,9 @@ You'll be able to use the bot once approved."""
                 await self._perform_search(from_number, doctor_name, specialty)
                 return
 
-            # No specialty - ask user to select one
+            # No specialty - ask user to select one (show all 38 specialties)
             user_session_manager.create_pending_search(from_number, doctor_name)
-            selection_menu = format_specialty_selection(doctor_name)
+            selection_menu = format_specialty_selection(doctor_name, show_full=True)
             await whatsapp_client.send_message(from_number, selection_menu)
             return
 
