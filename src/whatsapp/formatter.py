@@ -81,27 +81,29 @@ def format_welcome_message() -> str:
     """Welcome message for new users"""
     return """👋 Welcome to Doctor Review Bot!
 
-*How to use:*
-Send doctor's name + specialty for better results
+*Two ways to search:*
 
-*Format:*
-`Dr. [Name], [Specialty]`
+*Option 1: Quick search (with specialty)*
+Send doctor's name + specialty together
+Example: `Dr. Smith, Cardiology`
 
-*Examples:*
+*Option 2: Step-by-step (recommended)*
+1. Send just the doctor's name: `Dr. Smith`
+2. Choose specialty from our list (38 options)
+3. Or skip specialty selection
+
+*Supported formats:*
 • Dr. Smith, Cardiology
 • Dr. Johnson | Pediatrics
 • Dr. Williams - Dermatology
-• Dr. Lee Oncology
-
-*Common Specialties:*
-Cardiology, Dermatology, Endocrinology, Gastroenterology, Gynecology, Hematology, Neurology, Obstetrics, Oncology, Ophthalmology, Orthopedics, Pediatrics, Psychiatry, Surgery, Urology
+• Dr. Smith (bot will ask for specialty)
 
 *Features:*
-✅ Aggregates from Google Maps, Facebook and more
-✅ More accurate results with specialty
-✅ Shows review sources
+✅ Searches Google Maps, Facebook, and more
+✅ 38 medical specialties supported
+✅ Can skip specialty if unsure
 
-💡 *Tip:* Adding specialty improves search accuracy and reduces search time!"""
+💡 *Tip:* Step-by-step search gives you more control!"""
 
 
 def format_error_message(error_type: str = "general") -> str:
