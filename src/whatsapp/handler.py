@@ -193,7 +193,8 @@ You'll be able to use the bot once approved."""
             doctor_name = doctor_info.get("name")
             specialty = doctor_info.get("specialty", "")
 
-            if not doctor_name:
+            # Reject single digits or single characters as doctor names
+            if not doctor_name or len(doctor_name.strip()) <= 1:
                 response = format_error_message("invalid_input")
                 await whatsapp_client.send_message(from_number, response)
                 return
