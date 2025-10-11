@@ -167,6 +167,15 @@ You'll be able to use the bot once approved."""
             pending_search = user_session_manager.get_pending_search(from_number)
 
             if pending_search:
+                # Check if user wants to expand the menu
+                if message_text.strip().lower() in ["...", "more", "show more", "see all", "all"]:
+                    # User wants to see full specialty list
+                    user_session_manager.expand_menu(from_number)
+                    doctor_name = pending_search["doctor_name"]
+                    full_menu = format_specialty_selection(doctor_name, show_full=True)
+                    await whatsapp_client.send_message(from_number, full_menu)
+                    return  # Keep session active, wait for actual selection
+
                 # User is replying with specialty selection
                 specialty = self._parse_specialty_input(message_text)
                 doctor_name = pending_search["doctor_name"]
@@ -242,23 +251,46 @@ You'll be able to use the bot once approved."""
         """
         text = text.strip().lower()
 
-        # Specialty number mapping (expanded to 15 options)
+        # Specialty number mapping (all 38 specialties)
         SPECIALTY_MAP = {
             "1": "cardiology",
             "2": "dermatology",
-            "3": "pediatrics",
-            "4": "orthopedics",
-            "5": "gynecology",
-            "6": "oncology",
-            "7": "psychiatry",
-            "8": "neurology",
-            "9": "gastroenterology",
-            "10": "surgery",
-            "11": "ophthalmology",
-            "12": "urology",
-            "13": "endocrinology",
-            "14": "obstetrics",
-            "15": "other"
+            "3": "endocrinology & diabetes",
+            "4": "gastroenterology & hepatology",
+            "5": "general surgery",
+            "6": "obstetrics & gynaecology",
+            "7": "oncology",
+            "8": "ophthalmology",
+            "9": "orthopaedic surgery",
+            "10": "paediatrics",
+            "11": "anaesthesiology & critical care",
+            "12": "cardiothoracic surgery",
+            "13": "dentistry",
+            "14": "ear, nose & throat",
+            "15": "emergency medicine",
+            "16": "geriatric medicine",
+            "17": "haematology",
+            "18": "infectious diseases",
+            "19": "internal medicine",
+            "20": "nephrology",
+            "21": "neurology",
+            "22": "neurosurgery",
+            "23": "nuclear medicine",
+            "24": "pain medicine",
+            "25": "palliative medicine",
+            "26": "pathology",
+            "27": "plastic & reconstructive surgery",
+            "28": "psychiatry",
+            "29": "radiology",
+            "30": "rehabilitation medicine",
+            "31": "respiratory medicine",
+            "32": "rheumatology",
+            "33": "robotic surgery",
+            "34": "spine surgery",
+            "35": "sports medicine",
+            "36": "transplant medicine",
+            "37": "urology",
+            "38": "other"
         }
 
         # Check if user wants to skip

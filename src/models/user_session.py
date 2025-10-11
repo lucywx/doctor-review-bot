@@ -30,9 +30,40 @@ class UserSessionManager:
         self._sessions[phone_number] = {
             "doctor_name": doctor_name,
             "created_at": datetime.now(),
-            "state": "waiting_for_specialty"
+            "state": "waiting_for_specialty",
+            "menu_expanded": False  # Track if user has expanded the full menu
         }
         logger.info(f"📝 Created pending search session for {phone_number}: {doctor_name}")
+
+    def expand_menu(self, phone_number: str) -> bool:
+        """
+        Mark the menu as expanded for this session
+
+        Args:
+            phone_number: User's phone number
+
+        Returns:
+            True if session exists and was expanded, False otherwise
+        """
+        session = self._sessions.get(phone_number)
+        if session:
+            session["menu_expanded"] = True
+            logger.info(f"📋 Expanded specialty menu for {phone_number}")
+            return True
+        return False
+
+    def is_menu_expanded(self, phone_number: str) -> bool:
+        """
+        Check if menu is expanded for this session
+
+        Args:
+            phone_number: User's phone number
+
+        Returns:
+            True if menu is expanded
+        """
+        session = self._sessions.get(phone_number)
+        return session.get("menu_expanded", False) if session else False
 
     def get_pending_search(self, phone_number: str) -> Optional[dict]:
         """

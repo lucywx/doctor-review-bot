@@ -122,37 +122,81 @@ def format_processing_message() -> str:
     return "🔍 Searching... it takes 15-30 seconds"
 
 
-def format_specialty_selection(doctor_name: str) -> str:
+def format_specialty_selection(doctor_name: str, show_full: bool = False) -> str:
     """
-    Format specialty selection menu (compact version for better mobile UX)
+    Format specialty selection menu with expandable options
 
     Args:
         doctor_name: Doctor's name
+        show_full: If True, show all 38 specialties; if False, show top 10
 
     Returns:
         Formatted specialty selection message
     """
-    return f"""📋 *Select Specialty for {doctor_name}*
 
-*Quick Reply - Just type the number:*
+    # Top 10 most common specialties
+    top_specialties = [
+        "1. Cardiology",
+        "2. Dermatology",
+        "3. Endocrinology & Diabetes",
+        "4. Gastroenterology & Hepatology",
+        "5. General Surgery",
+        "6. Obstetrics & Gynaecology",
+        "7. Oncology",
+        "8. Ophthalmology",
+        "9. Orthopaedic Surgery",
+        "10. Paediatrics"
+    ]
 
-1. Cardiology
-2. Dermatology
-3. Pediatrics
-4. Orthopedics
-5. Gynecology
-6. Oncology
-7. Psychiatry
-8. Neurology
-9. Gastroenterology
-10. Surgery
-11. Ophthalmology
-12. Urology
-13. Endocrinology
-14. Obstetrics
-15. Other
+    # All 38 specialties (excluding top 10)
+    additional_specialties = [
+        "11. Anaesthesiology & Critical Care",
+        "12. Cardiothoracic Surgery",
+        "13. Dentistry",
+        "14. Ear, Nose & Throat (ENT)",
+        "15. Emergency Medicine",
+        "16. Geriatric Medicine",
+        "17. Haematology",
+        "18. Infectious Diseases",
+        "19. Internal Medicine",
+        "20. Nephrology",
+        "21. Neurology",
+        "22. Neurosurgery",
+        "23. Nuclear Medicine",
+        "24. Pain Medicine",
+        "25. Palliative Medicine",
+        "26. Pathology",
+        "27. Plastic & Reconstructive Surgery",
+        "28. Psychiatry",
+        "29. Radiology",
+        "30. Rehabilitation Medicine",
+        "31. Respiratory Medicine",
+        "32. Rheumatology",
+        "33. Robotic Surgery",
+        "34. Spine Surgery",
+        "35. Sports Medicine",
+        "36. Transplant Medicine",
+        "37. Urology",
+        "38. Other"
+    ]
 
-💡 Or type specialty name directly
-⏩ Reply `0` to skip
+    if show_full:
+        # Show all 38 specialties
+        all_specialties = "\n".join(top_specialties + additional_specialties)
+        return f"""📋 *{doctor_name} - All Specialties*
 
-_⏰ 5 min timeout_"""
+{all_specialties}
+
+Reply with number or name
+_(0 = skip)_"""
+    else:
+        # Show only top 10 + expansion option
+        top_list = "\n".join(top_specialties)
+        return f"""📋 *{doctor_name} - Select Specialty*
+
+{top_list}
+
+... _28 more_
+
+Reply number or `...` for full list
+_(0 = skip)_"""
