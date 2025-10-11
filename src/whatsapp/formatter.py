@@ -124,7 +124,7 @@ def format_processing_message() -> str:
 
 def format_specialty_selection(doctor_name: str) -> str:
     """
-    Format specialty selection menu
+    Format specialty selection menu (compact version for better mobile UX)
 
     Args:
         doctor_name: Doctor's name
@@ -134,28 +134,25 @@ def format_specialty_selection(doctor_name: str) -> str:
     """
     return f"""📋 *Select Specialty for {doctor_name}*
 
-Please reply with the specialty number or name:
+*Quick Reply - Just type the number:*
 
-*Common Specialties:*
-1️⃣ Cardiology (Heart)
-2️⃣ Dermatology (Skin)
-3️⃣ Pediatrics (Children)
-4️⃣ Orthopedics (Bones)
-5️⃣ Gynecology (Women)
-6️⃣ Oncology (Cancer)
-7️⃣ Psychiatry (Mental Health)
-8️⃣ Neurology (Brain)
-9️⃣ Gastroenterology (Digestive)
-🔟 Surgery
+1. Cardiology
+2. Dermatology
+3. Pediatrics
+4. Orthopedics
+5. Gynecology
+6. Oncology
+7. Psychiatry
+8. Neurology
+9. Gastroenterology
+10. Surgery
+11. Ophthalmology
+12. Urology
+13. Endocrinology
+14. Obstetrics
+15. Other
 
-*More Specialties:*
-• Endocrinology • Hematology
-• Obstetrics • Ophthalmology
-• Radiology • Urology
-• Anesthesiology • Pathology
+💡 Or type specialty name directly
+⏩ Reply `0` to skip
 
-💡 *Tips:*
-• Reply with number (e.g., `1`) or name (e.g., `Cardiology`)
-• Or reply `0` to skip specialty
-
-⏰ Session expires in 5 minutes"""
+_⏰ 5 min timeout_"""

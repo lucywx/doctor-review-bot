@@ -242,7 +242,7 @@ You'll be able to use the bot once approved."""
         """
         text = text.strip().lower()
 
-        # Specialty number mapping
+        # Specialty number mapping (expanded to 15 options)
         SPECIALTY_MAP = {
             "1": "cardiology",
             "2": "dermatology",
@@ -253,7 +253,12 @@ You'll be able to use the bot once approved."""
             "7": "psychiatry",
             "8": "neurology",
             "9": "gastroenterology",
-            "10": "surgery"
+            "10": "surgery",
+            "11": "ophthalmology",
+            "12": "urology",
+            "13": "endocrinology",
+            "14": "obstetrics",
+            "15": "other"
         }
 
         # Check if user wants to skip
