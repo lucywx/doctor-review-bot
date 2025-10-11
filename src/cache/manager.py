@@ -172,6 +172,12 @@ class CacheManager:
         """
         Generate a unique doctor ID from name and optional identifiers
 
+        Normalizes doctor names to ensure consistent cache hits:
+        - Removes common prefixes (Dr., Dr, Doctor, Prof., Prof)
+        - Converts to lowercase
+        - Removes extra whitespace
+        - This ensures "Dr. Smith", "Dr Smith", and "Smith" all map to same ID
+
         Args:
             name: Doctor's name
             hospital: Hospital name (optional)
@@ -180,7 +186,24 @@ class CacheManager:
         Returns:
             Unique doctor ID (MD5 hash)
         """
-        identifier = f"{name}|{hospital}|{location}".lower().strip()
+        # Normalize name for consistent cache hits
+        normalized_name = name.strip().lower()
+
+        # Remove common prefixes
+        prefixes = ["doctor ", "dr. ", "dr ", "prof. ", "prof "]
+        for prefix in prefixes:
+            if normalized_name.startswith(prefix):
+                normalized_name = normalized_name[len(prefix):].strip()
+                break
+
+        # Remove extra whitespace
+        normalized_name = " ".join(normalized_name.split())
+
+        # Normalize hospital and location
+        normalized_hospital = hospital.strip().lower() if hospital else ""
+        normalized_location = location.strip().lower() if location else ""
+
+        identifier = f"{normalized_name}|{normalized_hospital}|{normalized_location}"
         return hashlib.md5(identifier.encode()).hexdigest()
 
     async def cleanup_expired_cache(self) -> int:

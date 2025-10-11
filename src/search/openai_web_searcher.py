@@ -7,9 +7,6 @@ import logging
 from typing import List, Dict
 from openai import AsyncOpenAI
 from src.config import settings
-import httpx
-import asyncio
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +22,56 @@ class OpenAIWebSearcher:
         try:
             self.client = AsyncOpenAI(api_key=settings.openai_api_key)
             self.model = settings.openai_model
-            # HTTP client for fast URL validation (2s timeout)
-            self.http_client = httpx.AsyncClient(
-                follow_redirects=True,
-                timeout=2.0,  # Fast timeout to prevent delays
-                verify=False  # Skip SSL verification for speed
-            )
             logger.info(f"🌐 OpenAI Web Searcher initialized (model: {self.model})")
         except Exception as e:
             logger.error(f"❌ OpenAI API initialization failed: {e}")
             raise Exception("OpenAI API key is required for doctor review search")
+
+    def _generate_name_variations(self, name: str) -> str:
+        """
+        Generate common name variations for better search coverage
+
+        Examples:
+        - "John Smith" → "Dr John Smith", "Dr. John Smith", "John Smith", "Dr Smith"
+        - "Lee Wei Ming" → "Dr Lee Wei Ming", "Dr. Lee", "Lee Wei Ming"
+
+        Args:
+            name: Doctor's name
+
+        Returns:
+            Formatted string of name variations for search prompt
+        """
+        variations = []
+        name_clean = name.strip()
+
+        # Get base name (without prefix if present)
+        base_name = name_clean
+        for prefix in ["Doctor ", "Dr. ", "Dr ", "Prof. ", "Prof "]:
+            if name_clean.startswith(prefix):
+                base_name = name_clean[len(prefix):].strip()
+                break
+
+        # Generate variations
+        variations.append(f'"{base_name}"')  # Base name without title
+        variations.append(f'"Dr {base_name}"')  # With "Dr" prefix
+        variations.append(f'"Dr. {base_name}"')  # With "Dr." prefix
+        variations.append(f'"Doctor {base_name}"')  # With "Doctor" prefix
+
+        # For multi-part names (e.g., "Lee Wei Ming"), also try shortened form
+        name_parts = base_name.split()
+        if len(name_parts) >= 2:
+            # Try "Dr [Last Name]" for common patterns
+            variations.append(f'"Dr {name_parts[0]}"')  # e.g., "Dr Lee"
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_variations = []
+        for v in variations:
+            if v not in seen:
+                seen.add(v)
+                unique_variations.append(v)
+
+        return ", ".join(unique_variations[:5])  # Limit to 5 variations
 
     def _extract_specialty_keywords(self, specialty: str) -> str:
         """
@@ -54,20 +91,56 @@ class OpenAIWebSearcher:
         specialty_lower = specialty.lower()
         keywords = []
 
-        # Specialty-specific keyword mappings
+        # Specialty-specific keyword mappings (all 38 specialties)
         specialty_map = {
-            "obstetrics & gynaecology": ["obstetric", "gynaecolog", "gynecolog", "ob/gyn", "o&g", "obgyn"],
+            "cardiology": ["cardiology", "cardiologist", "heart", "cardiac"],
+            "dermatology": ["dermatology", "dermatologist", "skin", "dermatologic"],
+            "endocrinology & diabetes": ["endocrinology", "endocrinologist", "diabetes", "hormone", "thyroid"],
+            "endocrinology": ["endocrinology", "endocrinologist", "diabetes", "hormone", "thyroid"],
+            "gastroenterology & hepatology": ["gastro", "GI", "digestive", "liver", "gastroenterologist", "hepatology"],
+            "gastroenterology": ["gastro", "GI", "digestive", "liver", "gastroenterologist"],
+            "general surgery": ["surgeon", "surgery", "surgical", "general surgery"],
+            "obstetrics & gynaecology": ["obstetric", "gynaecolog", "gynecolog", "ob/gyn", "o&g", "obgyn", "women health"],
+            "obstetrics": ["obstetric", "pregnancy", "childbirth", "prenatal"],
+            "gynaecology": ["gynaecolog", "gynecolog", "women health", "gynae"],
+            "oncology": ["oncology", "cancer", "oncologist", "tumor", "chemotherapy"],
+            "ophthalmology": ["ophthalmology", "ophthalmologist", "eye", "vision", "optometry"],
+            "orthopaedic surgery": ["ortho", "orthopedic", "bone", "joint", "orthopedist", "musculoskeletal"],
+            "orthopedic": ["ortho", "orthopedic", "bone", "joint", "orthopedist"],
+            "paediatrics": ["pediatric", "paediatric", "children", "kids", "pediatrician"],
+            "pediatrics": ["pediatric", "paediatric", "children", "kids", "pediatrician"],
+            "anaesthesiology & critical care": ["anesthesia", "anaesthesia", "anesthetist", "critical care", "ICU"],
+            "anaesthesiology": ["anesthesia", "anaesthesia", "anesthetist", "anesthesiologist"],
+            "anesthesiology": ["anesthesia", "anaesthesia", "anesthetist", "anesthesiologist"],
+            "cardiothoracic surgery": ["cardiothoracic", "heart surgery", "chest surgery", "cardiac surgery", "thoracic"],
+            "dentistry": ["dentist", "dental", "teeth", "oral health", "orthodontist"],
             "ear, nose & throat": ["ENT", "ear nose throat", "otolaryngology", "ent specialist"],
-            "cardiology": ["cardiology", "cardiologist", "heart"],
-            "dermatology": ["dermatology", "dermatologist", "skin"],
-            "gastroenterology & hepatology": ["gastro", "GI", "digestive", "liver"],
-            "general surgery": ["surgeon", "surgery", "surgical"],
-            "ophthalmology": ["ophthalmology", "eye", "vision"],
-            "orthopaedic surgery": ["ortho", "orthopedic", "bone", "joint"],
-            "paediatrics": ["pediatric", "paediatric", "children", "kids"],
-            "psychiatry": ["psychiatry", "mental health", "psychiatrist"],
-            "neurology": ["neurology", "neurologist", "brain", "nerve"],
-            "oncology": ["oncology", "cancer", "oncologist"],
+            "ear nose throat": ["ENT", "ear nose throat", "otolaryngology", "ent specialist"],
+            "emergency medicine": ["emergency", "ER", "emergency room", "trauma", "urgent care"],
+            "geriatric medicine": ["geriatric", "elderly", "aging", "gerontology", "senior care"],
+            "haematology": ["hematology", "haematology", "blood", "hematologist"],
+            "hematology": ["hematology", "haematology", "blood", "hematologist"],
+            "infectious diseases": ["infectious disease", "infection", "communicable disease", "tropical medicine"],
+            "internal medicine": ["internal medicine", "internist", "general medicine"],
+            "nephrology": ["nephrology", "nephrologist", "kidney", "renal", "dialysis"],
+            "neurology": ["neurology", "neurologist", "brain", "nerve", "neurological"],
+            "neurosurgery": ["neurosurgery", "neurosurgeon", "brain surgery", "spine surgery"],
+            "nuclear medicine": ["nuclear medicine", "radioisotope", "PET scan", "nuclear imaging"],
+            "pain medicine": ["pain medicine", "pain management", "chronic pain", "pain specialist"],
+            "palliative medicine": ["palliative", "hospice", "end of life", "comfort care"],
+            "pathology": ["pathology", "pathologist", "lab medicine", "biopsy", "histology"],
+            "plastic & reconstructive surgery": ["plastic surgery", "cosmetic", "reconstructive", "aesthetic"],
+            "plastic surgery": ["plastic surgery", "cosmetic", "reconstructive", "aesthetic"],
+            "psychiatry": ["psychiatry", "psychiatrist", "mental health", "psychiatric"],
+            "radiology": ["radiology", "radiologist", "imaging", "X-ray", "MRI", "CT scan"],
+            "rehabilitation medicine": ["rehabilitation", "rehab", "physical medicine", "physiatry"],
+            "respiratory medicine": ["respiratory", "pulmonology", "lung", "pulmonologist", "breathing"],
+            "rheumatology": ["rheumatology", "rheumatologist", "arthritis", "autoimmune", "joint disease"],
+            "robotic surgery": ["robotic surgery", "robot assisted", "da vinci", "minimally invasive"],
+            "spine surgery": ["spine surgery", "spinal", "back surgery", "vertebrae"],
+            "sports medicine": ["sports medicine", "athletic", "sports injury", "exercise medicine"],
+            "transplant medicine": ["transplant", "organ transplant", "transplantation"],
+            "urology": ["urology", "urologist", "urinary", "bladder", "prostate", "kidney"],
         }
 
         # Check for direct match in map
@@ -108,63 +181,6 @@ class OpenAIWebSearcher:
 
         return False
 
-    async def _check_single_url(self, url: str) -> tuple[bool, str]:
-        """
-        Fast check if single URL redirects to different domain
-        Returns: (is_valid, final_url)
-        """
-        try:
-            # Quick HEAD request with 2s timeout
-            response = await self.http_client.head(url, follow_redirects=True)
-
-            original_domain = urlparse(url).netloc
-            final_domain = urlparse(str(response.url)).netloc
-
-            # Check if domain changed
-            if original_domain != final_domain:
-                logger.warning(f"⚠️ URL redirects: {original_domain} → {final_domain}")
-                return False, str(response.url)
-
-            return True, url
-
-        except asyncio.TimeoutError:
-            logger.warning(f"⚠️ URL timeout (2s): {url}")
-            return False, url
-        except Exception as e:
-            logger.warning(f"⚠️ URL check failed: {url} - {e}")
-            return False, url
-
-    async def _validate_urls_batch(self, review_list: list) -> list:
-        """
-        Validate multiple URLs concurrently
-        Returns: filtered list with only valid URLs
-        """
-        # Extract URLs
-        urls_to_check = []
-        for review in review_list:
-            url = review.get("url", "")
-            if url and url.startswith(("http://", "https://")):
-                urls_to_check.append((review, url))
-
-        if not urls_to_check:
-            return review_list
-
-        # Concurrent validation
-        logger.info(f"🔍 Validating {len(urls_to_check)} URLs concurrently...")
-        tasks = [self._check_single_url(url) for _, url in urls_to_check]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Filter valid reviews
-        valid_reviews = []
-        for (review, url), result in zip(urls_to_check, results):
-            if isinstance(result, tuple) and result[0]:  # is_valid = True
-                valid_reviews.append(review)
-            else:
-                logger.warning(f"⚠️ Filtered out review with invalid URL: {url}")
-
-        logger.info(f"✅ {len(valid_reviews)}/{len(urls_to_check)} URLs are valid")
-        return valid_reviews
-
     async def search_doctor_reviews(
         self,
         doctor_name: str,
@@ -172,7 +188,12 @@ class OpenAIWebSearcher:
         location: str = ""
     ) -> Dict:
         """
-        Search for doctor reviews using OpenAI web_search
+        Search for doctor reviews using OpenAI web_search with fallback strategy
+
+        Strategy: Progressive search degradation for maximum precision + recall
+        1. First try: Doctor name + specialty (strict matching)
+        2. If results < threshold: Retry without specialty (broader search)
+        3. Merge and deduplicate results, prioritizing specialty-matched reviews
 
         Args:
             doctor_name: Doctor's name
@@ -185,64 +206,78 @@ class OpenAIWebSearcher:
         try:
             # CRITICAL: Never use mock data for doctor reviews
             logger.info(f"🌐 Searching web for: {doctor_name}")
-            
-            # Build search instructions with flexible specialty matching
-            specialty_hint = ""
+
+            # PHASE 1: Search with specialty (if provided)
             if specialty:
-                # Extract key terms from specialty for flexible matching
-                # e.g., "Obstetrics & Gynaecology" → search for "obstetric OR gynaecolog OR gynecolog OR ob/gyn"
                 specialty_keywords = self._extract_specialty_keywords(specialty)
-                specialty_hint = f"\nSpecialty context (use flexibly): {specialty_keywords}"
-                logger.info(f"🔍 Specialty keywords: {specialty_keywords}")
+                logger.info(f"🎯 PHASE 1: Searching with specialty constraint: {specialty_keywords}")
 
-            location_hint = f"\nLocation: {location}" if location else ""
+                reviews_with_specialty = await self._search_with_constraint(
+                    doctor_name,
+                    specialty_keywords,
+                    location,
+                    require_specialty=True
+                )
 
-            # Use OpenAI Responses API with web search (ChatGPT-like capability)
-            logger.info(f"🔍 Calling OpenAI Responses API for: {doctor_name}")
-            logger.info(f"🤖 Using model: gpt-4o-mini (web_search compatible, 16.7x cheaper)")
+                logger.info(f"✅ Phase 1 found {len(reviews_with_specialty)} reviews WITH specialty match")
 
-            # Let OpenAI find all reviews, we'll validate URLs programmatically
-            response = await self.client.responses.create(
-                model="gpt-4o-mini",  # Cost: $0.15/1M input (vs $2.50 for gpt-4o)
-                tools=[{"type": "web_search"}],  # Enable web search tool
-                input=f"""Find patient reviews for: "Dr {doctor_name}"{specialty_hint}{location_hint}
+                # If we found enough results (>=3), use them
+                if len(reviews_with_specialty) >= 3:
+                    logger.info(f"✅ Sufficient results with specialty, returning {len(reviews_with_specialty)} reviews")
+                    return {
+                        "doctor_name": doctor_name,
+                        "reviews": reviews_with_specialty,
+                        "source": "openai_web_search_with_specialty",
+                        "total_count": len(reviews_with_specialty),
+                        "search_strategy": "specialty_only"
+                    }
 
-Search globally: Google Maps, Facebook, Yelp, Healthgrades, RateMDs, Zocdoc, forums, blogs, review sites
+                # PHASE 2: Not enough results, try without specialty constraint
+                logger.warning(f"⚠️ Only {len(reviews_with_specialty)} reviews with specialty - trying broader search...")
+                reviews_without_specialty = await self._search_with_constraint(
+                    doctor_name,
+                    specialty_keywords,
+                    location,
+                    require_specialty=False
+                )
 
-IMPORTANT:
-- Prioritize reviews matching the specialty if provided, but also include other reviews
-- Use flexible matching (e.g., "gynae", "gynaecology", "ob/gyn" all match)
-- Return ALL relevant reviews for this doctor
+                logger.info(f"✅ Phase 2 found {len(reviews_without_specialty)} reviews WITHOUT specialty constraint")
 
-Return JSON only:
-[{{"source":"Google Maps","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":4.5,"url":"https://maps.google.com/..."}}]
+                # Merge results: specialty-matched reviews first, then others
+                merged_reviews = self._merge_and_deduplicate_reviews(
+                    reviews_with_specialty,
+                    reviews_without_specialty
+                )
 
-CRITICAL: "url" must be full http/https link (not description)
-Empty if none: []"""
-            )
+                logger.info(f"✅ Final merged result: {len(merged_reviews)} reviews (after deduplication)")
 
-            logger.info(f"✅ OpenAI API call successful, response type: {type(response)}")
+                return {
+                    "doctor_name": doctor_name,
+                    "reviews": merged_reviews,
+                    "source": "openai_web_search_merged",
+                    "total_count": len(merged_reviews),
+                    "search_strategy": "fallback_merged",
+                    "specialty_matched_count": len(reviews_with_specialty),
+                    "additional_count": len(merged_reviews) - len(reviews_with_specialty)
+                }
 
-            # Log raw response for debugging
-            if hasattr(response, 'output_text'):
-                output_preview = response.output_text[:300] if response.output_text else "EMPTY"
-                logger.info(f"📝 Response preview: {output_preview}...")
+            # No specialty provided - direct search
+            else:
+                logger.info(f"🔍 No specialty provided - direct search for: {doctor_name}")
+                reviews = await self._search_with_constraint(
+                    doctor_name,
+                    "",
+                    location,
+                    require_specialty=False
+                )
 
-            # Parse response and extract reviews
-            reviews = await self._parse_openai_response(response, doctor_name)
-
-            logger.info(f"✅ Found {len(reviews)} reviews via OpenAI web search")
-
-            if len(reviews) == 0:
-                logger.warning("⚠️ WARNING: 0 reviews found - this might indicate an issue")
-                logger.warning(f"⚠️ Response output_text length: {len(response.output_text) if hasattr(response, 'output_text') else 'N/A'}")
-            
-            return {
-                "doctor_name": doctor_name,
-                "reviews": reviews,
-                "source": "openai_web_search",
-                "total_count": len(reviews)
-            }
+                return {
+                    "doctor_name": doctor_name,
+                    "reviews": reviews,
+                    "source": "openai_web_search",
+                    "total_count": len(reviews),
+                    "search_strategy": "no_specialty"
+                }
 
         except Exception as e:
             import traceback
@@ -256,6 +291,115 @@ Empty if none: []"""
                 "total_count": 0,
                 "error": f"Search failed: {str(e)}"
             }
+
+    async def _search_with_constraint(
+        self,
+        doctor_name: str,
+        specialty_keywords: str,
+        location: str,
+        require_specialty: bool
+    ) -> List[Dict]:
+        """
+        Internal method to search with or without specialty constraint
+
+        Args:
+            doctor_name: Doctor's name
+            specialty_keywords: Extracted specialty keywords
+            location: Location hint
+            require_specialty: If True, REQUIRE specialty match; if False, make it optional
+
+        Returns:
+            List of review dicts
+        """
+        specialty_instruction = ""
+        if specialty_keywords:
+            if require_specialty:
+                specialty_instruction = f"""
+CRITICAL REQUIREMENT: ONLY return reviews that explicitly mention this doctor's specialty.
+Specialty keywords to match: {specialty_keywords}
+
+The review text must mention one of these specialty terms. Do NOT return reviews that don't mention the specialty.
+"""
+            else:
+                specialty_instruction = f"""
+Optional context (NOT required): Doctor's specialty may be related to: {specialty_keywords}
+Return ALL reviews for this doctor, regardless of specialty mention.
+"""
+
+        location_hint = f"\nLocation context: {location}" if location else ""
+
+        # Generate name variations for better search coverage
+        name_variations = self._generate_name_variations(doctor_name)
+
+        # Build search prompt
+        search_prompt = f"""Find patient reviews for: "Dr {doctor_name}"{location_hint}
+{specialty_instruction}
+
+IMPORTANT: Search for the doctor using these name variations:
+{name_variations}
+
+Search globally: Google Maps, Facebook, Yelp, Healthgrades, RateMDs, Zocdoc, forums, blogs, review sites
+
+Return JSON only:
+[{{"source":"Google Maps","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":4.5,"url":"https://maps.google.com/..."}}]
+
+CRITICAL: "url" must be full http/https link (not description)
+Empty if none: []"""
+
+        logger.info(f"🔍 Calling OpenAI API (require_specialty={require_specialty})")
+
+        # Call OpenAI API
+        response = await self.client.responses.create(
+            model="gpt-4o-mini",
+            tools=[{"type": "web_search"}],
+            input=search_prompt
+        )
+
+        # Parse response
+        reviews = await self._parse_openai_response(response, doctor_name)
+
+        if len(reviews) == 0:
+            logger.warning(f"⚠️ 0 reviews found (require_specialty={require_specialty})")
+
+        return reviews
+
+    def _merge_and_deduplicate_reviews(
+        self,
+        priority_reviews: List[Dict],
+        additional_reviews: List[Dict]
+    ) -> List[Dict]:
+        """
+        Merge two review lists, removing duplicates based on URL
+        Priority reviews (with specialty match) come first
+
+        Args:
+            priority_reviews: Reviews that matched specialty (higher priority)
+            additional_reviews: Reviews without specialty constraint (lower priority)
+
+        Returns:
+            Merged and deduplicated list
+        """
+        # Track seen URLs to avoid duplicates
+        seen_urls = set()
+        merged = []
+
+        # Add priority reviews first
+        for review in priority_reviews:
+            url = review.get("url", "")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                merged.append(review)
+
+        # Add additional reviews (skip if URL already exists)
+        for review in additional_reviews:
+            url = review.get("url", "")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                merged.append(review)
+
+        logger.info(f"🔄 Deduplication: {len(priority_reviews)} + {len(additional_reviews)} → {len(merged)} reviews")
+
+        return merged
 
     async def _parse_openai_response(self, response, doctor_name: str) -> List[Dict]:
         """Parse OpenAI response and extract reviews"""
@@ -350,11 +494,12 @@ Empty if none: []"""
 
                     logger.info(f"✅ Parsed {len(reviews)} reviews from JSON (after blacklist)")
 
-                    # Step 2: Batch validate URLs concurrently (2s timeout per URL, all parallel)
-                    if reviews:
-                        logger.info(f"🔍 Starting batch URL validation for {len(reviews)} reviews...")
-                        reviews = await self._validate_urls_batch(reviews)
-                        logger.info(f"✅ After validation: {len(reviews)} reviews remain")
+                    # URL validation is disabled because:
+                    # 1. Blacklist check already filters known bad domains (fast, 0ms)
+                    # 2. URL format validation ensures http/https URLs only
+                    # 3. Batch validation was too aggressive and filtered valid reviews
+                    # 4. Real-time validation adds 2-4s latency per search
+                    # Trade-off: Accept some potentially invalid URLs for better coverage and speed
 
                     return reviews
 

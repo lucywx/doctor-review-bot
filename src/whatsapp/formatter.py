@@ -134,8 +134,9 @@ def format_specialty_selection(doctor_name: str, show_full: bool = True) -> str:
         Formatted specialty selection message
     """
 
-    # All 38 specialties
+    # All 38 specialties with skip option
     all_specialties = [
+        "0. Skip (No specialty)",
         "1. Cardiology",
         "2. Dermatology",
         "3. Endocrinology & Diabetes",

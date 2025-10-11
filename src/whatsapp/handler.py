@@ -183,7 +183,7 @@ You'll be able to use the bot once approved."""
                     await whatsapp_client.send_message(from_number, response)
                     return
 
-                # Proceed to search with specialty
+                # Proceed to search with specialty (empty string if user skipped)
                 await self._perform_search(from_number, doctor_name, specialty)
                 return
 
@@ -386,7 +386,7 @@ You'll be able to use the bot once approved."""
         Returns:
             Dict with 'name' and 'specialty' keys
         """
-        # List of common medical specialties (English)
+        # List of common medical specialties (English) - keep lowercase for matching
         SPECIALTIES = [
             "cardiology", "dermatology", "endocrinology", "gastroenterology",
             "gynecology", "hematology", "neurology", "obstetrics", "oncology",
@@ -396,40 +396,52 @@ You'll be able to use the bot once approved."""
             "internal medicine", "general practice", "gp"
         ]
 
-        # Normalize input
-        text = text.lower().strip()
+        # Keep original text for doctor name, but create lowercase version for specialty matching
+        original_text = text.strip()
+        text_lower = text.lower().strip()
 
-        # Remove common prefixes
+        # Remove common prefixes (case insensitive)
         for prefix in ["doctor", "dr.", "dr", "prof.", "prof"]:
-            if text.startswith(prefix):
-                text = text[len(prefix):].strip()
+            if text_lower.startswith(prefix):
+                # Remove prefix from original text, preserving case
+                prefix_len = len(prefix)
+                original_text = original_text[prefix_len:].strip()
+                text_lower = text_lower[prefix_len:].strip()
+                break
 
         specialty = ""
-        doctor_name = text
+        doctor_name = original_text  # Keep original case
 
-        # Try to extract specialty using delimiters
+        # Try to extract specialty using delimiters (case insensitive matching)
         for delimiter in [",", "|", "-", "/"]:
-            if delimiter in text:
-                parts = text.split(delimiter, 1)
-                doctor_name = parts[0].strip()
+            if delimiter in text_lower:
+                parts = text_lower.split(delimiter, 1)
+                doctor_name_part = parts[0].strip()
                 potential_specialty = parts[1].strip()
 
-                # Check if it's a known specialty
+                # Check if it's a known specialty (case insensitive)
                 if any(spec in potential_specialty for spec in SPECIALTIES):
                     specialty = potential_specialty
+                    # Extract doctor name from original text
+                    original_parts = original_text.split(delimiter, 1)
+                    doctor_name = original_parts[0].strip()
                     break
 
-        # If no delimiter, try to find specialty in text
+        # If no delimiter, try to find specialty in text (case insensitive)
         if not specialty:
             for spec in SPECIALTIES:
-                if spec in text:
+                if spec in text_lower:
                     # Found specialty in text
-                    doctor_name = text.replace(spec, "").strip()
+                    # Remove specialty from original text, preserving case
                     specialty = spec
+                    # Find the specialty in original text (case insensitive)
+                    import re
+                    pattern = re.compile(re.escape(spec), re.IGNORECASE)
+                    doctor_name = pattern.sub("", original_text).strip()
                     break
 
-        # Clean up doctor name
-        doctor_name = doctor_name.strip()
+        # Clean up doctor name - remove extra spaces
+        doctor_name = " ".join(doctor_name.split())
 
         return {
             "name": doctor_name if doctor_name else "",
