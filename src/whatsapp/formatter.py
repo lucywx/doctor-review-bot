@@ -83,11 +83,11 @@ def format_welcome_message() -> str:
 
 *Two ways to search:*
 
-*Option 1: Quick search (with specialty)*
+*Option 1: Quick search*
 Send doctor's name + specialty together
 Example: `Dr. Smith, Cardiology`
 
-*Option 2: Step-by-step (recommended)*
+*Option 2: Step-by-step*
 1. Send just the doctor's name: `Dr. Smith`
 2. Choose specialty from our list (38 options)
 3. Or skip specialty selection
@@ -96,14 +96,7 @@ Example: `Dr. Smith, Cardiology`
 • Dr. Smith, Cardiology
 • Dr. Johnson | Pediatrics
 • Dr. Williams - Dermatology
-• Dr. Smith (bot will ask for specialty)
-
-*Features:*
-✅ Searches Google Maps, Facebook, and more
-✅ 38 medical specialties supported
-✅ Can skip specialty if unsure
-
-💡 *Tip:* Step-by-step search gives you more control!"""
+• Dr. Smith (bot will ask for specialty)"""
 
 
 def format_error_message(error_type: str = "general") -> str:
