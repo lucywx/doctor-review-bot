@@ -208,15 +208,8 @@ You'll be able to use the bot once approved."""
                 await whatsapp_client.send_message(from_number, response)
                 return
 
-            # If specialty provided, search immediately
-            if specialty:
-                await self._perform_search(from_number, doctor_name, specialty)
-                return
-
-            # No specialty - ask user to select one (show all 38 specialties)
-            user_session_manager.create_pending_search(from_number, doctor_name)
-            selection_menu = format_specialty_selection(doctor_name, show_full=True)
-            await whatsapp_client.send_message(from_number, selection_menu)
+            # Simple strategy: Always search directly (specialty is optional)
+            await self._perform_search(from_number, doctor_name, specialty)
             return
 
         except Exception as e:

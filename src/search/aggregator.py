@@ -28,7 +28,7 @@ class SearchAggregator:
 
         Args:
             doctor_name: Doctor's name
-            location: Optional location
+            location: City/hospital name in Malaysia (defaults to "Malaysia" if empty)
             specialty: Optional medical specialty
 
         Returns:
