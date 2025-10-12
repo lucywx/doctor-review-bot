@@ -109,13 +109,15 @@ class OpenAIWebSearcher:
 
             search_prompt = f"""Search for patient reviews and information about doctor: {name_variations}{location_hint}
 
-Search these sources:
-1. Google Maps reviews
-2. Facebook reviews and comments
-3. Malaysian hospital websites
-4. Healthcare forums (Lowyat, Cari)
-5. Medical directories
-6. Professional profiles
+Search ALL these Malaysian sources:
+1. Google Maps reviews (Malaysia)
+2. Facebook (pages, groups, comments)
+3. Lowyat Forum (forum.lowyat.net)
+4. Cari Forum (cari.com.my)
+5. Hospital websites (Gleneagles, Pantai, Prince Court, Sunway Medical)
+6. Healthgrades, RateMDs
+7. Medical directories and professional profiles
+8. Malaysian healthcare blogs
 
 Return JSON array (even if only 1 review found):
 [{{"source":"Google Maps","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":4.5,"url":"https://..."}}]
