@@ -15,7 +15,19 @@ def format_review_response(doctor_name: str, reviews: list) -> str:
         Formatted message string
     """
     if not reviews:
-        return f"❌ Sorry, no reviews found for *{doctor_name}*.\n\nPlease try:\n• Enter full name\n• Add hospital name\n• Check spelling"
+        return f"""❌ No reviews found for *{doctor_name}*
+
+This doctor may have limited online presence. This can happen when:
+• Doctor is relatively new or practices in smaller clinics
+• Patients haven't posted online reviews yet
+• Information is only available offline
+
+📍 *What you can do:*
+• Try adding hospital/clinic name (e.g., "Tang Boon Nee Gleneagles")
+• Check spelling carefully
+• Contact the hospital directly for doctor information
+
+_We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
 
     # Sort reviews by date (newest first)
     def parse_date(review):

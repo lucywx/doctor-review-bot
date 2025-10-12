@@ -107,14 +107,21 @@ class OpenAIWebSearcher:
             # Build simple search prompt
             location_hint = f" in {location}" if location else " in Malaysia"
 
-            search_prompt = f"""Find patient reviews for doctor: {name_variations}{location_hint}
+            search_prompt = f"""Search for patient reviews and information about doctor: {name_variations}{location_hint}
 
-Search on: Google Maps, Facebook, Malaysian healthcare forums and review sites.
+Search these sources:
+1. Google Maps reviews
+2. Facebook reviews and comments
+3. Malaysian hospital websites
+4. Healthcare forums (Lowyat, Cari)
+5. Medical directories
+6. Professional profiles
 
-Return JSON array of reviews:
+Return JSON array (even if only 1 review found):
 [{{"source":"Google Maps","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":4.5,"url":"https://..."}}]
 
-Return empty array if none found: []"""
+IMPORTANT: Include ALL reviews found, even brief mentions or single reviews.
+Return empty array only if absolutely nothing found: []"""
 
             logger.info(f"🌐 Calling OpenAI web search...")
 
