@@ -40,53 +40,57 @@ _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
     sorted_reviews = sorted(reviews, key=parse_date, reverse=True)
 
     # Build header
-    message = f"🔍 *{doctor_name}* Review Summary\n\n"
+    message = f"🔍 *{doctor_name}*\nFound {len(reviews)} reviews\n\n"
 
-    # Show reviews (limit to 8)
-    display_reviews = sorted_reviews[:8]
+    # WhatsApp limit: 1600 characters
+    # Strategy: Show fewer reviews with shorter snippets to stay under limit
+    MAX_MESSAGE_LENGTH = 1500  # Leave buffer
+    display_reviews = sorted_reviews[:5]  # Reduce from 8 to 5
 
     for i, review in enumerate(display_reviews, 1):
         snippet = review.get("snippet", "")
         date = review.get("review_date", "")
         url = review.get("url", "")
 
-        # Truncate snippet to approximately 2 lines (150 chars for mobile)
-        # This allows roughly 75 chars per line on most mobile screens
-        max_length = 150
+        # Truncate snippet to 80 chars (about 1 line)
+        max_length = 80
         if len(snippet) > max_length:
             truncated_snippet = snippet[:max_length].rstrip()
             # Ensure we don't cut in the middle of a word
             last_space = truncated_snippet.rfind(' ')
-            if last_space > max_length - 20:  # Only if last space is reasonably close
+            if last_space > max_length - 20:
                 truncated_snippet = truncated_snippet[:last_space]
             snippet_display = f"{truncated_snippet}..."
         else:
             snippet_display = snippet
 
-        # Format review with number
-        message += f'{i}. "{snippet_display}"\n'
+        # Format review entry
+        review_entry = f'{i}. "{snippet_display}"\n'
 
-        # Add date if available
-        if date:
-            message += f"    📅 {date}\n"
-
-        # Add URL with emoji - disable WhatsApp link preview
+        # Add URL (shortened) - no date to save space
         if url and len(url) > 10:
-            # Remove http(s):// prefix to prevent link preview
+            # Shorten URL to domain + path
             clean_url = url.replace("https://", "").replace("http://", "")
-            message += f"    🔗 {clean_url}\n"
+            # Truncate very long URLs
+            if len(clean_url) > 50:
+                clean_url = clean_url[:47] + "..."
+            review_entry += f"   🔗 {clean_url}\n"
 
-        # Empty line between reviews
-        message += "\n"
+        review_entry += "\n"
+
+        # Check if adding this review would exceed limit
+        if len(message) + len(review_entry) > MAX_MESSAGE_LENGTH:
+            break
+
+        message += review_entry
 
     # Show count if more reviews available
-    if len(reviews) > 8:
-        message += f"_... and {len(reviews) - 8} more reviews_\n\n"
+    remaining = len(reviews) - i
+    if remaining > 0:
+        message += f"_+{remaining} more reviews_\n\n"
 
-    # Footer
-    message += "━━━━━━━━━━━━━━━\n"
-    message += "_Data sourced from public networks, for reference only_\n"
-    message += "_For more information, please contact the hospital directly_"
+    # Simplified footer
+    message += "_Sources: Google, Facebook, forums_"
 
     return message
 
