@@ -91,6 +91,51 @@ _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
     return message
 
 
+def format_review_batch(batch: list, start_num: int, batch_num: int, total_batches: int) -> str:
+    """
+    Format a batch of reviews for WhatsApp
+
+    Args:
+        batch: List of review dicts (max 5)
+        start_num: Starting number for this batch
+        batch_num: Current batch number
+        total_batches: Total number of batches
+
+    Returns:
+        Formatted message string
+    """
+    message = f"📋 *Part {batch_num}/{total_batches}*\n\n"
+
+    for i, review in enumerate(batch, start=start_num):
+        snippet = review.get("snippet", "")
+        url = review.get("url", "")
+
+        # Truncate snippet to 100 chars
+        max_length = 100
+        if len(snippet) > max_length:
+            truncated_snippet = snippet[:max_length].rstrip()
+            last_space = truncated_snippet.rfind(' ')
+            if last_space > max_length - 20:
+                truncated_snippet = truncated_snippet[:last_space]
+            snippet_display = f"{truncated_snippet}..."
+        else:
+            snippet_display = snippet
+
+        # Format review entry
+        message += f'{i}. "{snippet_display}"\n'
+
+        # Add URL (shortened)
+        if url and len(url) > 10:
+            clean_url = url.replace("https://", "").replace("http://", "")
+            if len(clean_url) > 50:
+                clean_url = clean_url[:47] + "..."
+            message += f"   🔗 {clean_url}\n"
+
+        message += "\n"
+
+    return message.rstrip()
+
+
 def format_welcome_message() -> str:
     """Welcome message for new users"""
     return """👋 Welcome to Doctor Review Bot!

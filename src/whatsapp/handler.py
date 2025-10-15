@@ -320,12 +320,9 @@ You'll be able to use the bot once approved."""
                 estimated_cost_usd=0.0 if response_time_ms < 500 else 0.01
             )
 
-            # Send formatted results
-            await whatsapp_client.send_formatted_review(
-                from_number,
-                doctor_name,
-                reviews
-            )
+            # Send results in batches to show all reviews
+            # Each message can hold ~5 reviews within 1600 char limit
+            await self._send_reviews_in_batches(from_number, doctor_name, reviews)
 
         except Exception as e:
             logger.error(f"❌ Error performing search: {e}", exc_info=True)
@@ -412,6 +409,55 @@ You'll be able to use the bot once approved."""
             "name": doctor_name if doctor_name else "",
             "specialty": specialty
         }
+
+    async def _send_reviews_in_batches(self, from_number: str, doctor_name: str, reviews: list):
+        """
+        Send reviews in multiple messages to show all results
+
+        Args:
+            from_number: User's phone number
+            doctor_name: Doctor's name
+            reviews: List of all reviews
+        """
+        from src.whatsapp.formatter import format_review_batch
+
+        if not reviews:
+            from src.whatsapp.formatter import format_review_response
+            no_results = format_review_response(doctor_name, [])
+            await whatsapp_client.send_message(from_number, no_results)
+            return
+
+        # Send summary first
+        summary = f"🔍 *{doctor_name}*\nFound {len(reviews)} reviews\n\n_Sending all results..._"
+        await whatsapp_client.send_message(from_number, summary)
+
+        # Send in batches of 5 reviews per message
+        batch_size = 5
+        total_batches = (len(reviews) + batch_size - 1) // batch_size
+
+        for batch_num in range(total_batches):
+            start_idx = batch_num * batch_size
+            end_idx = min(start_idx + batch_size, len(reviews))
+            batch = reviews[start_idx:end_idx]
+
+            # Format batch message
+            message = format_review_batch(
+                batch=batch,
+                start_num=start_idx + 1,
+                batch_num=batch_num + 1,
+                total_batches=total_batches
+            )
+
+            # Send batch
+            await whatsapp_client.send_message(from_number, message)
+
+            # Small delay between messages to avoid rate limits
+            import asyncio
+            await asyncio.sleep(0.5)
+
+        # Send footer
+        footer = "_Sources: Google, Facebook, forums_"
+        await whatsapp_client.send_message(from_number, footer)
 
     async def _search_doctor_reviews(self, doctor_name: str) -> list:
         """
