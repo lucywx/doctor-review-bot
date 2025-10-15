@@ -126,6 +126,7 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
     for i, review in enumerate(batch, start=start_num):
         snippet = review.get("snippet", "")
         url = review.get("url", "")
+        review_date = review.get("review_date", "")
 
         # Truncate snippet to 100 chars
         max_length = 100
@@ -141,7 +142,11 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
         # Format review entry
         message += f'{i}. "{snippet_display}"\n'
 
-        # Add URL (shortened)
+        # Add date and URL on same line to save space
+        date_url_line = "   "
+        if review_date:
+            message += f"   📅 {review_date}\n"
+
         if url and len(url) > 10:
             clean_url = url.replace("https://", "").replace("http://", "")
             if len(clean_url) > 50:

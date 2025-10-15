@@ -439,9 +439,19 @@ You'll be able to use the bot once approved."""
             )
             return
 
+        # Sort by date (newest first)
+        def parse_date(review):
+            """Extract date for sorting"""
+            date_str = review.get("review_date", "")
+            if not date_str:
+                return "1900-01-01"  # Put undated reviews at end
+            return date_str
+
+        sorted_reviews = sorted(valid_reviews, key=parse_date, reverse=True)
+
         # Limit to 2 parts maximum (10 reviews per part)
         max_reviews = 20  # Show max 20 reviews total
-        display_reviews = valid_reviews[:max_reviews]
+        display_reviews = sorted_reviews[:max_reviews]
 
         # Calculate batch size to fit in 2 parts
         if len(display_reviews) <= 10:
@@ -459,7 +469,7 @@ You'll be able to use the bot once approved."""
             end_idx = min(start_idx + batch_size, len(display_reviews))
             batch = display_reviews[start_idx:end_idx]
 
-            # Format batch message with header
+            # Format batch message with header (no filtered_count to remove "X removed" message)
             message = format_review_batch(
                 batch=batch,
                 start_num=start_idx + 1,
@@ -467,7 +477,7 @@ You'll be able to use the bot once approved."""
                 total_batches=total_batches if total_batches > 1 else None,
                 doctor_name=doctor_name,
                 total_count=len(valid_reviews),
-                filtered_count=len(reviews) - len(valid_reviews) if len(reviews) != len(valid_reviews) else 0
+                filtered_count=0  # Set to 0 to hide "X removed" message
             )
 
             # Send batch
