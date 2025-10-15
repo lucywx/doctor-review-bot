@@ -174,13 +174,25 @@ class GoogleSearcher:
         try:
             from openai import AsyncOpenAI
             import json
+            import asyncio
+            import time
 
             openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
             all_reviews = []
             failed_urls = []
 
+            # Track processing time to avoid timeout
+            start_time = time.time()
+            max_processing_time = 25  # seconds (leave 5 seconds buffer for WhatsApp timeout)
+
             # Process URLs - try GPT-4 extraction first
-            for url_dict in urls[:15]:  # Limit to 15 URLs to manage API costs
+            # Reduced to 8 URLs for faster response time
+            for url_dict in urls[:8]:
+                # Check if we're approaching timeout
+                elapsed = time.time() - start_time
+                if elapsed > max_processing_time:
+                    logger.warning(f"⏱️ Timeout approaching ({elapsed:.1f}s), stopping extraction")
+                    break
                 url = url_dict.get("url", "")
                 google_snippet = url_dict.get("snippet", "")
 
@@ -188,8 +200,8 @@ class GoogleSearcher:
                     continue
 
                 try:
-                    # Fetch HTML content
-                    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                    # Fetch HTML content with shorter timeout
+                    async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
                         response = await client.get(url)
 
                         if response.status_code != 200:
@@ -197,7 +209,7 @@ class GoogleSearcher:
                             failed_urls.append(url_dict)
                             continue
 
-                        html_content = response.text[:50000]  # Limit to 50k chars (forums need more content)
+                        html_content = response.text[:30000]  # Limit to 30k chars (balance between content and speed)
 
                     # Use GPT-4 to extract ONLY genuine patient reviews
                     extraction_prompt = f"""Analyze this webpage and extract ONLY genuine patient reviews about {doctor_name}.
