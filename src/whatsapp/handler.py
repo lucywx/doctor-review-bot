@@ -427,16 +427,15 @@ You'll be able to use the bot once approved."""
             await whatsapp_client.send_message(from_number, no_results)
             return
 
-        # Validate and filter URLs first
-        logger.info(f"Validating {len(reviews)} review URLs...")
-        valid_reviews = await self._filter_valid_reviews(reviews)
-        logger.info(f"Kept {len(valid_reviews)} reviews with valid URLs")
+        # Skip URL validation - GPT-4 already extracted valid reviews
+        # URL validation was too strict and slow (HTTP GET for each URL)
+        logger.info(f"Using {len(reviews)} reviews from GPT-4 extraction")
+        valid_reviews = reviews
 
         if not valid_reviews:
-            await whatsapp_client.send_message(
-                from_number,
-                f"❌ Found {len(reviews)} reviews but all URLs are invalid or broken."
-            )
+            from src.whatsapp.formatter import format_review_response
+            no_results = format_review_response(doctor_name, [])
+            await whatsapp_client.send_message(from_number, no_results)
             return
 
         # Sort by date (newest first)
