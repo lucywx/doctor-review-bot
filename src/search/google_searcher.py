@@ -158,41 +158,112 @@ class GoogleSearcher:
 
     async def extract_content_with_openai(self, urls: List[Dict], doctor_name: str) -> Dict:
         """
-        Use OpenAI to extract review content from URLs
+        Scrape URLs and use GPT-4 to extract genuine patient reviews from HTML content
 
-        This method uses OpenAI's web search to find reviews about the doctor
-        using the URLs found by Google as search hints
+        This method:
+        1. Fetches HTML content from each URL
+        2. Sends HTML to GPT-4 to analyze and extract ONLY genuine patient reviews
+        3. Filters out doctor bios, introductions, and non-review content
 
         Args:
-            urls: List of URL dicts from search
+            urls: List of URL dicts from Google search
             doctor_name: Doctor's name
 
         Returns:
             Dict with extracted reviews
         """
         try:
-            from src.search.openai_web_searcher import openai_web_searcher
+            from openai import AsyncOpenAI
 
-            # Use OpenAI web search with the doctor name
-            # This will search for reviews using OpenAI's web search capabilities
-            search_result = await openai_web_searcher.search_doctor_reviews(
-                doctor_name=doctor_name,
-                specialty="",
-                location="Malaysia"
-            )
+            openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+            all_reviews = []
 
-            reviews = search_result.get("reviews", [])
-            
-            # Add source information from Google search
-            for review in reviews:
-                review["source"] = "google_custom_search + openai_web_search"
+            # Process URLs in batches to avoid timeout
+            for url_dict in urls[:15]:  # Limit to 15 URLs to manage API costs
+                url = url_dict.get("url", "")
+                if not url:
+                    continue
 
-            logger.info(f"✅ Extracted {len(reviews)} reviews using OpenAI web search")
+                try:
+                    # Fetch HTML content
+                    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                        response = await client.get(url)
+
+                        if response.status_code != 200:
+                            continue
+
+                        html_content = response.text[:15000]  # Limit to 15k chars to save tokens
+
+                    # Use GPT-4 to extract ONLY genuine patient reviews
+                    extraction_prompt = f"""Analyze this webpage and extract ONLY genuine patient reviews about {doctor_name}.
+
+Rules:
+- ONLY include actual patient experiences and reviews
+- EXCLUDE doctor bios, introductions, and professional descriptions
+- EXCLUDE hospital promotional content
+- EXCLUDE "About the doctor" sections
+- EXCLUDE directory listings and contact information
+
+For each genuine patient review found, extract:
+1. The full review text (patient's words)
+2. Date (if available, in YYYY-MM-DD format)
+3. Author name (if available)
+
+URL: {url}
+
+HTML Content:
+{html_content}
+
+Return a JSON object with this EXACT structure:
+{{
+  "reviews": [
+    {{
+      "snippet": "Full patient review text here",
+      "review_date": "YYYY-MM-DD or empty string",
+      "author_name": "Name or empty string",
+      "url": "{url}"
+    }}
+  ]
+}}
+
+If NO genuine patient reviews are found, return: {{"reviews": []}}"""
+
+                    # Call GPT-4 for analysis
+                    completion = await openai_client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "You are an expert at extracting genuine patient reviews from webpages. You distinguish between patient reviews and doctor information."},
+                            {"role": "user", "content": extraction_prompt}
+                        ],
+                        temperature=0.1,
+                        response_format={"type": "json_object"}
+                    )
+
+                    # Parse response
+                    content = completion.choices[0].message.content
+                    import json
+                    result = json.loads(content)
+
+                    reviews = result.get("reviews", [])
+
+                    # Add source metadata
+                    for review in reviews:
+                        review["source"] = "google_custom_search + gpt4_extraction"
+                        review["url"] = url  # Ensure URL is present
+
+                    all_reviews.extend(reviews)
+                    logger.info(f"📄 Extracted {len(reviews)} reviews from {url}")
+
+                except Exception as e:
+                    logger.warning(f"Failed to extract from {url}: {e}")
+                    continue
+
+            logger.info(f"✅ Total extracted {len(all_reviews)} genuine patient reviews from {len(urls)} URLs")
 
             return {
-                "reviews": reviews,
-                "total_count": len(reviews),
-                "source": "google_custom_search + openai_web_search"
+                "reviews": all_reviews,
+                "total_count": len(all_reviews),
+                "source": "google_custom_search + gpt4_extraction"
             }
 
         except Exception as e:

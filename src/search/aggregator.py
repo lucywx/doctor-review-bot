@@ -90,15 +90,15 @@ class SearchAggregator:
             if urls:
                 logger.info(f"📍 Found {len(urls)} URLs from Google Search")
 
-                # Use OpenAI to extract actual patient reviews from these URLs
-                logger.info(f"🤖 Using OpenAI to extract patient reviews from URLs...")
+                # Use GPT-4 to analyze HTML and extract actual patient reviews
+                logger.info(f"🤖 Using GPT-4 to analyze pages and extract genuine patient reviews...")
                 extraction_result = await google_searcher.extract_content_with_openai(
                     urls=urls,
                     doctor_name=doctor_name
                 )
 
                 all_reviews = extraction_result.get("reviews", [])
-                source = extraction_result.get("source", "google + openai")
+                source = extraction_result.get("source", "google + gpt4")
 
                 logger.info(f"✅ Extracted {len(all_reviews)} genuine patient reviews")
             else:
