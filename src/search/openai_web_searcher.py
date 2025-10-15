@@ -1,6 +1,21 @@
 """
 OpenAI Web Search integration
 Uses OpenAI's web_search tool to find doctor reviews from the web
+
+⚠️ DEPRECATED - This file is no longer used in production ⚠️
+
+Reason: OpenAI's web_search tool is designed for general web searching,
+but when searching for a doctor's name, it returns doctor bios and introductions
+instead of patient reviews.
+
+Current approach (as of 2025-01-16):
+1. Google Custom Search API - finds relevant URLs (Facebook, forums, Google Maps)
+2. Direct HTML scraping - fetches actual page content from those URLs
+3. GPT-4 analysis - analyzes HTML to extract ONLY genuine patient reviews
+
+See: src/search/google_searcher.py:extract_content_with_openai()
+
+This file is kept for reference only.
 """
 
 import logging
