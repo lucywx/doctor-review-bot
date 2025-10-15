@@ -297,7 +297,7 @@ You'll be able to use the bot once approved."""
             import time
             start_time = time.time()
 
-            # Search for doctor reviews (no specialty needed)
+            # Search for doctor reviews using Google + OpenAI
             reviews = await self._search_doctor_reviews(doctor_name)
 
             # Calculate response time

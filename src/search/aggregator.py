@@ -90,37 +90,19 @@ class SearchAggregator:
             if urls:
                 logger.info(f"📍 Found {len(urls)} URLs from Google Search")
 
-                # Use Google search snippets directly as reviews
-                # No need to call OpenAI - saves cost and time
-                all_reviews = []
-                for url_data in urls:
-                    # Extract snippet from Google search result
-                    snippet = url_data.get("snippet", "")
-                    if snippet and len(snippet) > 20:  # Filter out very short snippets
-                        all_reviews.append({
-                            "snippet": snippet,
-                            "url": url_data.get("url", ""),
-                            "source": url_data.get("source", "google_custom_search"),
-                            "review_date": "",  # Google results don't include dates
-                            "sentiment": None
-                        })
+                # Use OpenAI to extract actual patient reviews from these URLs
+                logger.info(f"🤖 Using OpenAI to extract patient reviews from URLs...")
+                extraction_result = await google_searcher.extract_content_with_openai(
+                    urls=urls,
+                    doctor_name=doctor_name
+                )
 
-                logger.info(f"✅ Extracted {len(all_reviews)} reviews from Google search results")
+                all_reviews = extraction_result.get("reviews", [])
+                source = extraction_result.get("source", "google + openai")
+
+                logger.info(f"✅ Extracted {len(all_reviews)} genuine patient reviews")
             else:
-                logger.warning("⚠️ No results found via Google Search")
-
-            # NOTE: OpenAI web_search code is preserved below but not used
-            # Uncomment if you want to use OpenAI as fallback
-            #
-            # if not all_reviews:
-            #     logger.info(f"🌐 Falling back to OpenAI web search...")
-            #     search_result = await openai_web_searcher.search_doctor_reviews(
-            #         doctor_name=doctor_name,
-            #         specialty=specialty,
-            #         location=search_location
-            #     )
-            #     all_reviews = search_result.get("reviews", [])
-            #     source = "openai_web_search"
+                logger.warning("⚠️ No URLs found via Google Search")
 
             if not all_reviews:
                 logger.info(f"❌ No reviews found for {doctor_name}")
