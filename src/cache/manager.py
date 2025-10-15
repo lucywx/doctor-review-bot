@@ -107,6 +107,11 @@ class CacheManager:
                     ON CONFLICT (hash) DO NOTHING
                 """
 
+                # Convert empty strings to None for database fields
+                review_date = review.get("review_date")
+                if review_date == "":
+                    review_date = None
+
                 result = await db.execute(
                     query,
                     doctor_id,
@@ -119,7 +124,7 @@ class CacheManager:
                     review.get("snippet"),
                     review.get("sentiment"),
                     review.get("rating"),
-                    review.get("review_date"),
+                    review_date,  # Use None instead of empty string
                     review.get("author_name"),
                     hash_value,
                     valid_until.isoformat(),
