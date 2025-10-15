@@ -160,13 +160,12 @@ class GoogleSearcher:
         """
         Scrape URLs and use GPT-4 to extract genuine patient reviews from HTML content
 
-        This method:
-        1. Fetches HTML content from each URL
-        2. Sends HTML to GPT-4 to analyze and extract ONLY genuine patient reviews
-        3. Filters out doctor bios, introductions, and non-review content
+        Strategy:
+        1. Try to fetch HTML and use GPT-4 to extract patient reviews
+        2. Fallback: If GPT-4 extraction fails or finds nothing, use Google's snippet
 
         Args:
-            urls: List of URL dicts from Google search
+            urls: List of URL dicts from Google search (includes url, title, snippet)
             doctor_name: Doctor's name
 
         Returns:
@@ -174,13 +173,17 @@ class GoogleSearcher:
         """
         try:
             from openai import AsyncOpenAI
+            import json
 
             openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
             all_reviews = []
+            failed_urls = []
 
-            # Process URLs in batches to avoid timeout
+            # Process URLs - try GPT-4 extraction first
             for url_dict in urls[:15]:  # Limit to 15 URLs to manage API costs
                 url = url_dict.get("url", "")
+                google_snippet = url_dict.get("snippet", "")
+
                 if not url:
                     continue
 
@@ -190,6 +193,8 @@ class GoogleSearcher:
                         response = await client.get(url)
 
                         if response.status_code != 200:
+                            logger.warning(f"❌ HTTP {response.status_code} for {url}")
+                            failed_urls.append(url_dict)
                             continue
 
                         html_content = response.text[:15000]  # Limit to 15k chars to save tokens
@@ -241,24 +246,47 @@ If NO genuine patient reviews are found, return: {{"reviews": []}}"""
 
                     # Parse response
                     content = completion.choices[0].message.content
-                    import json
                     result = json.loads(content)
-
                     reviews = result.get("reviews", [])
 
-                    # Add source metadata
-                    for review in reviews:
-                        review["source"] = "google_custom_search + gpt4_extraction"
-                        review["url"] = url  # Ensure URL is present
+                    if reviews:
+                        # Add source metadata
+                        for review in reviews:
+                            review["source"] = "google_custom_search + gpt4_extraction"
+                            review["url"] = url  # Ensure URL is present
 
-                    all_reviews.extend(reviews)
-                    logger.info(f"📄 Extracted {len(reviews)} reviews from {url}")
+                        all_reviews.extend(reviews)
+                        logger.info(f"📄 Extracted {len(reviews)} reviews from {url}")
+                    else:
+                        # GPT-4 found no reviews - mark for fallback
+                        logger.warning(f"⚠️ GPT-4 found no reviews in {url}")
+                        failed_urls.append(url_dict)
 
                 except Exception as e:
-                    logger.warning(f"Failed to extract from {url}: {e}")
+                    logger.warning(f"❌ Failed to extract from {url}: {e}")
+                    failed_urls.append(url_dict)
                     continue
 
-            logger.info(f"✅ Total extracted {len(all_reviews)} genuine patient reviews from {len(urls)} URLs")
+            # Fallback: Use Google snippets if GPT-4 extraction yielded few results
+            if len(all_reviews) < 5 and failed_urls:
+                logger.info(f"🔄 Using fallback: Google snippets for {len(failed_urls)} URLs")
+
+                for url_dict in failed_urls[:10]:  # Use up to 10 snippets as fallback
+                    snippet = url_dict.get("snippet", "")
+                    url = url_dict.get("url", "")
+
+                    if snippet and len(snippet) > 20:  # Only use meaningful snippets
+                        all_reviews.append({
+                            "snippet": snippet,
+                            "url": url,
+                            "review_date": "",
+                            "author_name": "",
+                            "source": "google_snippet"
+                        })
+
+                logger.info(f"📋 Added {len(failed_urls[:10])} Google snippets as fallback")
+
+            logger.info(f"✅ Total: {len(all_reviews)} reviews (GPT-4 + fallback)")
 
             return {
                 "reviews": all_reviews,
