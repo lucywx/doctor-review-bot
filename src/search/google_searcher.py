@@ -186,12 +186,13 @@ class GoogleSearcher:
             max_processing_time = 25  # seconds (leave 5 seconds buffer for WhatsApp timeout)
 
             # Process URLs - try GPT-4 extraction first
-            # Reduced to 8 URLs for faster response time
-            for url_dict in urls[:8]:
+            for url_dict in urls[:15]:  # Process up to 15 URLs
                 # Check if we're approaching timeout
                 elapsed = time.time() - start_time
                 if elapsed > max_processing_time:
                     logger.warning(f"⏱️ Timeout approaching ({elapsed:.1f}s), stopping extraction")
+                    # Continue with fallback for remaining URLs
+                    failed_urls.extend(urls[len(all_reviews):])
                     break
                 url = url_dict.get("url", "")
                 google_snippet = url_dict.get("snippet", "")
