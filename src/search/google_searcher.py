@@ -197,7 +197,7 @@ class GoogleSearcher:
                             failed_urls.append(url_dict)
                             continue
 
-                        html_content = response.text[:15000]  # Limit to 15k chars to save tokens
+                        html_content = response.text[:50000]  # Limit to 50k chars (forums need more content)
 
                     # Use GPT-4 to extract ONLY genuine patient reviews
                     extraction_prompt = f"""Analyze this webpage and extract ONLY genuine patient reviews about {doctor_name}.
