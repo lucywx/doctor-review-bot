@@ -491,17 +491,20 @@ You'll be able to use the bot once approved."""
 
         valid_reviews = []
 
-        # Patterns that indicate official hospital content (not patient reviews)
+        # Patterns that indicate official hospital/doctor content (not patient reviews)
         official_patterns = [
             '/videos',  # Hospital videos
             '/posts/',  # Official posts
-            '/photos/a.',  # Official photo albums
-            'subangjayamedicalcentre/videos',
-            'subangjayamedicalcentre/posts',
+            '/photos/',  # Photo posts (usually official)
+            'medicalcentre/videos',
+            'medicalcentre/posts',
+            'medicalcentre/photos',
+            'MNCC.MALAYSIA',  # Medical organization pages (removed leading /)
             'gleneagles',
-            'hospital',
-            'clinic/posts',
-            'medical-centre/videos'
+            'hospital/',
+            'clinic/',
+            'medical-centre',
+            'aestheticsadvisor.com',  # Doctor directories (not real reviews)
         ]
 
         # Patterns that indicate genuine patient reviews
@@ -533,21 +536,49 @@ You'll be able to use the bot once approved."""
                     continue
 
                 # Additional content-based filtering
+                # Filter out empty/placeholder content
+                if any(phrase in snippet for phrase in [
+                    'not yet rated',
+                    '0 reviews',
+                    'no reviews',
+                    'profile photo',
+                    'address:',
+                    'google ... dr.',  # Google search result snippet
+                    'mbbs',  # Just doctor credentials
+                ]):
+                    logger.debug(f"Filtered empty/non-review content: {snippet[:50]}...")
+                    continue
+
                 # Skip if snippet sounds like official announcement
-                if any(word in snippet for word in ['consultant', 'specialist', 'services', 'introducing', 'welcome']):
+                if any(word in snippet for word in ['consultant', 'obstetrician & gynaecologist', 'services']):
                     # But keep if it also has review keywords
-                    if not any(word in snippet for word in ['review', 'experience', 'patient', 'visited', 'recommend']):
+                    if not any(word in snippet for word in ['she did', 'he did', 'experience', 'visited', 'recommend', 'delivered']):
                         logger.debug(f"Filtered promotional content: {snippet[:50]}...")
                         continue
 
                 try:
-                    # Quick HEAD request to check if URL is accessible
-                    response = await client.head(url, timeout=3.0)
+                    # Use GET to check actual page content (not just HEAD)
+                    # Some sites return 200 for HEAD but page is actually 404
+                    response = await client.get(url, timeout=3.0)
 
-                    if 200 <= response.status_code < 400:
-                        valid_reviews.append(review)
-                    else:
+                    # Check status code
+                    if not (200 <= response.status_code < 400):
                         logger.debug(f"Invalid URL (status {response.status_code}): {url[:60]}...")
+                        continue
+
+                    # Check if page content indicates 404/error
+                    content_text = response.text.lower()
+                    if any(error in content_text for error in [
+                        'page not found',
+                        '404',
+                        'content not found',
+                        'this page isn\'t available',
+                        'sorry, this page isn\'t available'
+                    ]):
+                        logger.debug(f"Page not found (200 but 404 content): {url[:60]}...")
+                        continue
+
+                    valid_reviews.append(review)
 
                 except Exception as e:
                     logger.debug(f"Broken URL: {url[:60]}... - {str(e)[:50]}")
