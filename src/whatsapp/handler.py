@@ -453,24 +453,21 @@ You'll be able to use the bot once approved."""
             batch_size = (len(display_reviews) + 1) // 2  # Split evenly
             total_batches = 2
 
-        # Send summary first
-        summary = f"🔍 *{doctor_name}*\nFound {len(valid_reviews)} reviews"
-        if len(valid_reviews) != len(reviews):
-            summary += f" ({len(reviews) - len(valid_reviews)} with broken links removed)"
-        await whatsapp_client.send_message(from_number, summary)
-
-        # Send in batches
+        # Send all batches with header and footer in each message
         for batch_num in range(total_batches):
             start_idx = batch_num * batch_size
             end_idx = min(start_idx + batch_size, len(display_reviews))
             batch = display_reviews[start_idx:end_idx]
 
-            # Format batch message
+            # Format batch message with header
             message = format_review_batch(
                 batch=batch,
                 start_num=start_idx + 1,
                 batch_num=batch_num + 1 if total_batches > 1 else None,
-                total_batches=total_batches if total_batches > 1 else None
+                total_batches=total_batches if total_batches > 1 else None,
+                doctor_name=doctor_name,
+                total_count=len(valid_reviews),
+                filtered_count=len(reviews) - len(valid_reviews) if len(reviews) != len(valid_reviews) else 0
             )
 
             # Send batch
@@ -479,10 +476,6 @@ You'll be able to use the bot once approved."""
             # Small delay between messages
             import asyncio
             await asyncio.sleep(0.3)
-
-        # Send footer
-        footer = "_Sources: Google, Facebook, forums_"
-        await whatsapp_client.send_message(from_number, footer)
 
     async def _filter_valid_reviews(self, reviews: list) -> list:
         """

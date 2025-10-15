@@ -91,25 +91,38 @@ _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
     return message
 
 
-def format_review_batch(batch: list, start_num: int, batch_num: int = None, total_batches: int = None) -> str:
+def format_review_batch(batch: list, start_num: int, batch_num: int = None, total_batches: int = None,
+                        doctor_name: str = "", total_count: int = 0, filtered_count: int = 0) -> str:
     """
-    Format a batch of reviews for WhatsApp
+    Format a batch of reviews for WhatsApp with header and footer
 
     Args:
         batch: List of review dicts
         start_num: Starting number for this batch
         batch_num: Current batch number (optional, None for single batch)
         total_batches: Total number of batches (optional, None for single batch)
+        doctor_name: Doctor's name for header
+        total_count: Total number of valid reviews
+        filtered_count: Number of filtered/invalid reviews
 
     Returns:
         Formatted message string
     """
-    # Only show "Part X/Y" if there are multiple batches
-    if batch_num and total_batches and total_batches > 1:
-        message = f"📋 *Part {batch_num}/{total_batches}*\n\n"
+    # Header with doctor name and count (only on first part or if single message)
+    if batch_num == 1 or batch_num is None:
+        message = f"🔍 *{doctor_name}*\n"
+        message += f"Found {total_count} reviews"
+        if filtered_count > 0:
+            message += f" ({filtered_count} removed)"
+        message += "\n\n"
     else:
         message = ""
 
+    # Part indicator (only if multiple parts)
+    if batch_num and total_batches and total_batches > 1:
+        message += f"📋 *Part {batch_num}/{total_batches}*\n\n"
+
+    # Reviews
     for i, review in enumerate(batch, start=start_num):
         snippet = review.get("snippet", "")
         url = review.get("url", "")
@@ -136,6 +149,10 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
             message += f"   🔗 {clean_url}\n"
 
         message += "\n"
+
+    # Footer (on last part or if single message)
+    if batch_num == total_batches or batch_num is None:
+        message += "_Sources: Google, Facebook, forums_"
 
     return message.rstrip()
 
