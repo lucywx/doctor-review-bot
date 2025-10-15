@@ -128,8 +128,8 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
         url = review.get("url", "")
         review_date = review.get("review_date", "")
 
-        # Truncate snippet to 100 chars
-        max_length = 100
+        # Truncate snippet to ~80 chars (2 lines on mobile, ~40 chars per line)
+        max_length = 80
         if len(snippet) > max_length:
             truncated_snippet = snippet[:max_length].rstrip()
             last_space = truncated_snippet.rfind(' ')
@@ -142,8 +142,7 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
         # Format review entry
         message += f'{i}. "{snippet_display}"\n'
 
-        # Add date and URL on same line to save space
-        date_url_line = "   "
+        # Add date and URL (no extra spacing)
         if review_date:
             message += f"   📅 {review_date}\n"
 
@@ -153,7 +152,7 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
                 clean_url = clean_url[:47] + "..."
             message += f"   🔗 {clean_url}\n"
 
-        message += "\n"
+        # No blank line between reviews to save space
 
     # Footer (on last part or if single message)
     if batch_num == total_batches or batch_num is None:
