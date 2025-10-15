@@ -84,12 +84,8 @@ _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
 
         message += review_entry
 
-    # Show count if more reviews available
-    remaining = len(reviews) - i
-    if remaining > 0:
-        message += f"_+{remaining} more reviews_\n\n"
-
-    # Simplified footer
+    # Show count summary (no "more reviews" text - avoid false expectations)
+    message += f"\n_Showing {i}/{len(reviews)} reviews_\n"
     message += "_Sources: Google, Facebook, forums_"
 
     return message
