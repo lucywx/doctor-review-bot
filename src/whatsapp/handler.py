@@ -427,37 +427,140 @@ You'll be able to use the bot once approved."""
             await whatsapp_client.send_message(from_number, no_results)
             return
 
+        # Validate and filter URLs first
+        logger.info(f"Validating {len(reviews)} review URLs...")
+        valid_reviews = await self._filter_valid_reviews(reviews)
+        logger.info(f"Kept {len(valid_reviews)} reviews with valid URLs")
+
+        if not valid_reviews:
+            await whatsapp_client.send_message(
+                from_number,
+                f"❌ Found {len(reviews)} reviews but all URLs are invalid or broken."
+            )
+            return
+
+        # Limit to 2 parts maximum (10 reviews per part)
+        max_reviews = 20  # Show max 20 reviews total
+        display_reviews = valid_reviews[:max_reviews]
+
+        # Calculate batch size to fit in 2 parts
+        if len(display_reviews) <= 10:
+            # 1 part if 10 or fewer
+            batch_size = len(display_reviews)
+            total_batches = 1
+        else:
+            # 2 parts if more than 10
+            batch_size = (len(display_reviews) + 1) // 2  # Split evenly
+            total_batches = 2
+
         # Send summary first
-        summary = f"🔍 *{doctor_name}*\nFound {len(reviews)} reviews\n\n_Sending all results..._"
+        summary = f"🔍 *{doctor_name}*\nFound {len(valid_reviews)} reviews"
+        if len(valid_reviews) != len(reviews):
+            summary += f" ({len(reviews) - len(valid_reviews)} with broken links removed)"
         await whatsapp_client.send_message(from_number, summary)
 
-        # Send in batches of 5 reviews per message
-        batch_size = 5
-        total_batches = (len(reviews) + batch_size - 1) // batch_size
-
+        # Send in batches
         for batch_num in range(total_batches):
             start_idx = batch_num * batch_size
-            end_idx = min(start_idx + batch_size, len(reviews))
-            batch = reviews[start_idx:end_idx]
+            end_idx = min(start_idx + batch_size, len(display_reviews))
+            batch = display_reviews[start_idx:end_idx]
 
             # Format batch message
             message = format_review_batch(
                 batch=batch,
                 start_num=start_idx + 1,
-                batch_num=batch_num + 1,
-                total_batches=total_batches
+                batch_num=batch_num + 1 if total_batches > 1 else None,
+                total_batches=total_batches if total_batches > 1 else None
             )
 
             # Send batch
             await whatsapp_client.send_message(from_number, message)
 
-            # Small delay between messages to avoid rate limits
+            # Small delay between messages
             import asyncio
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
 
         # Send footer
         footer = "_Sources: Google, Facebook, forums_"
         await whatsapp_client.send_message(from_number, footer)
+
+    async def _filter_valid_reviews(self, reviews: list) -> list:
+        """
+        Filter out reviews with invalid URLs and official hospital content
+
+        Args:
+            reviews: List of review dicts
+
+        Returns:
+            List of genuine patient reviews with valid URLs
+        """
+        import httpx
+
+        valid_reviews = []
+
+        # Patterns that indicate official hospital content (not patient reviews)
+        official_patterns = [
+            '/videos',  # Hospital videos
+            '/posts/',  # Official posts
+            '/photos/a.',  # Official photo albums
+            'subangjayamedicalcentre/videos',
+            'subangjayamedicalcentre/posts',
+            'gleneagles',
+            'hospital',
+            'clinic/posts',
+            'medical-centre/videos'
+        ]
+
+        # Patterns that indicate genuine patient reviews
+        review_patterns = [
+            '/groups/',  # Facebook groups (patient discussions)
+            '/reviews',  # Review pages
+            'forum',  # Forum discussions
+            'cari.com.my',
+            'lowyat.net',
+            'google.com/maps',  # Google Maps reviews
+            'maps.google.com'
+        ]
+
+        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
+            for review in reviews:
+                url = review.get("url", "")
+                snippet = review.get("snippet", "").lower()
+
+                if not url or len(url) < 10:
+                    continue
+
+                # Filter out official hospital content
+                url_lower = url.lower()
+                is_official = any(pattern in url_lower for pattern in official_patterns)
+                is_review = any(pattern in url_lower for pattern in review_patterns)
+
+                if is_official and not is_review:
+                    logger.debug(f"Filtered official content: {url[:60]}...")
+                    continue
+
+                # Additional content-based filtering
+                # Skip if snippet sounds like official announcement
+                if any(word in snippet for word in ['consultant', 'specialist', 'services', 'introducing', 'welcome']):
+                    # But keep if it also has review keywords
+                    if not any(word in snippet for word in ['review', 'experience', 'patient', 'visited', 'recommend']):
+                        logger.debug(f"Filtered promotional content: {snippet[:50]}...")
+                        continue
+
+                try:
+                    # Quick HEAD request to check if URL is accessible
+                    response = await client.head(url, timeout=3.0)
+
+                    if 200 <= response.status_code < 400:
+                        valid_reviews.append(review)
+                    else:
+                        logger.debug(f"Invalid URL (status {response.status_code}): {url[:60]}...")
+
+                except Exception as e:
+                    logger.debug(f"Broken URL: {url[:60]}... - {str(e)[:50]}")
+                    continue
+
+        return valid_reviews
 
     async def _search_doctor_reviews(self, doctor_name: str) -> list:
         """

@@ -91,20 +91,24 @@ _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
     return message
 
 
-def format_review_batch(batch: list, start_num: int, batch_num: int, total_batches: int) -> str:
+def format_review_batch(batch: list, start_num: int, batch_num: int = None, total_batches: int = None) -> str:
     """
     Format a batch of reviews for WhatsApp
 
     Args:
-        batch: List of review dicts (max 5)
+        batch: List of review dicts
         start_num: Starting number for this batch
-        batch_num: Current batch number
-        total_batches: Total number of batches
+        batch_num: Current batch number (optional, None for single batch)
+        total_batches: Total number of batches (optional, None for single batch)
 
     Returns:
         Formatted message string
     """
-    message = f"📋 *Part {batch_num}/{total_batches}*\n\n"
+    # Only show "Part X/Y" if there are multiple batches
+    if batch_num and total_batches and total_batches > 1:
+        message = f"📋 *Part {batch_num}/{total_batches}*\n\n"
+    else:
+        message = ""
 
     for i, review in enumerate(batch, start=start_num):
         snippet = review.get("snippet", "")
