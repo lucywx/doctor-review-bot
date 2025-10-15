@@ -7,7 +7,7 @@ import hashlib
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
-from src.database_sqlite import db
+from src.database import db
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,8 @@ class CacheManager:
                     snippet, sentiment, source, url, rating,
                     review_date, author_name, metadata
                 FROM doctor_reviews
-                WHERE doctor_id = ?
-                  AND valid_until > datetime('now')
+                WHERE doctor_id = $1
+                  AND valid_until > NOW()
                   AND display_policy != 'hidden'
                 ORDER BY
                     CASE sentiment
@@ -97,13 +97,14 @@ class CacheManager:
                 content = f"{review.get('url', '')}|{review.get('snippet', '')}"
                 hash_value = hashlib.sha256(content.encode()).hexdigest()
 
-                # Insert or ignore if duplicate
+                # Insert or ignore if duplicate (PostgreSQL: ON CONFLICT DO NOTHING)
                 query = """
-                    INSERT OR IGNORE INTO doctor_reviews (
+                    INSERT INTO doctor_reviews (
                         doctor_id, doctor_name, doctor_specialty, hospital_name, location,
                         source, url, snippet, sentiment, rating, review_date, author_name,
                         hash, fetched_at, valid_until, display_policy, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, 'normal', ?)
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, 'normal', $15)
+                    ON CONFLICT (hash) DO NOTHING
                 """
 
                 result = await db.execute(
@@ -125,7 +126,9 @@ class CacheManager:
                     None  # metadata as JSON
                 )
 
-                if result > 0:
+                # PostgreSQL execute returns command tag (e.g., "INSERT 0 1")
+                # Check if insertion was successful
+                if "INSERT" in result:
                     saved_count += 1
 
             logger.info(f"💾 Saved {saved_count}/{len(reviews)} reviews to cache for {doctor_name}")
@@ -149,10 +152,10 @@ class CacheManager:
             query = """
                 SELECT
                     COUNT(*) as total,
-                    SUM(CASE WHEN valid_until > datetime('now') THEN 1 ELSE 0 END) as valid,
+                    SUM(CASE WHEN valid_until > NOW() THEN 1 ELSE 0 END) as valid,
                     MAX(fetched_at) as last_fetched
                 FROM doctor_reviews
-                WHERE doctor_id = ?
+                WHERE doctor_id = $1
             """
 
             result = await db.fetchrow(query, doctor_id)
@@ -216,7 +219,7 @@ class CacheManager:
         try:
             query = """
                 DELETE FROM doctor_reviews
-                WHERE valid_until < datetime('now', '-30 days')
+                WHERE valid_until < NOW() - INTERVAL '30 days'
             """
 
             result = await db.execute(query)

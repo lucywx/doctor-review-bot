@@ -6,7 +6,7 @@ import logging
 import json
 from datetime import datetime
 from typing import Optional, List
-from src.database_sqlite import db
+from src.database import db
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +49,10 @@ class SearchLogger:
                     cache_hit, response_time_ms, sources_used, results_count,
                     api_calls_count, estimated_cost_usd, error_message,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
             """
 
-            # Convert sources list to JSON string for SQLite
+            # Convert sources list to JSON string
             sources_json = json.dumps(sources_used)
 
             await db.execute(
@@ -61,7 +61,7 @@ class SearchLogger:
                 doctor_name,
                 doctor_id,
                 None,  # location
-                1 if cache_hit else 0,
+                cache_hit,  # PostgreSQL uses boolean
                 response_time_ms,
                 sources_json,
                 results_count,
@@ -81,9 +81,9 @@ class SearchLogger:
             query = """
                 SELECT doctor_name, cache_hit, response_time_ms, results_count, created_at
                 FROM search_logs
-                WHERE user_id = ?
+                WHERE user_id = $1
                 ORDER BY created_at DESC
-                LIMIT ?
+                LIMIT $2
             """
 
             results = await db.fetch(query, user_id, limit)
@@ -99,12 +99,12 @@ class SearchLogger:
             query = """
                 SELECT
                     COUNT(*) as total_searches,
-                    SUM(CASE WHEN cache_hit = 1 THEN 1 ELSE 0 END) as cache_hits,
+                    SUM(CASE WHEN cache_hit = true THEN 1 ELSE 0 END) as cache_hits,
                     AVG(response_time_ms) as avg_response_time,
                     SUM(estimated_cost_usd) as total_cost,
                     SUM(api_calls_count) as total_api_calls
                 FROM search_logs
-                WHERE DATE(created_at) = DATE('now')
+                WHERE DATE(created_at) = CURRENT_DATE
             """
 
             result = await db.fetchrow(query)
@@ -134,10 +134,10 @@ class SearchLogger:
                     COUNT(*) as search_count,
                     MAX(created_at) as last_searched
                 FROM search_logs
-                WHERE DATE(created_at) >= DATE('now', '-7 days')
+                WHERE DATE(created_at) >= CURRENT_DATE - INTERVAL '7 days'
                 GROUP BY doctor_name
                 ORDER BY search_count DESC
-                LIMIT ?
+                LIMIT $1
             """
 
             results = await db.fetch(query, limit)

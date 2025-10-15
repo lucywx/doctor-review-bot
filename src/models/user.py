@@ -6,7 +6,7 @@ import hashlib
 import logging
 from datetime import date
 from typing import Optional
-from src.database_sqlite import db
+from src.database import db
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class UserQuotaManager:
     async def _get_or_create_user(self, user_id: str) -> dict:
         """Get user or create new one"""
         # Try to get existing user
-        query = "SELECT * FROM user_sessions WHERE user_id = ?"
+        query = "SELECT * FROM user_sessions WHERE user_id = $1"
         user = await db.fetchrow(query, user_id)
 
         if user:
@@ -78,13 +78,13 @@ class UserQuotaManager:
                 user_id, phone_number_hash, is_active, role,
                 daily_quota, today_usage, total_searches,
                 first_seen_at, last_active_at, quota_reset_at
-            ) VALUES (?, ?, 1, 'user', ?, 0, 0, datetime('now'), datetime('now'), date('now'))
+            ) VALUES ($1, $2, true, 'user', $3, 0, 0, NOW(), NOW(), CURRENT_DATE)
         """
 
         await db.execute(query, user_id, phone_hash, self.daily_quota)
 
         # Fetch newly created user
-        user = await db.fetchrow("SELECT * FROM user_sessions WHERE user_id = ?", user_id)
+        user = await db.fetchrow("SELECT * FROM user_sessions WHERE user_id = $1", user_id)
         logger.info(f"✅ Created new user: {user_id}")
         return user
 
@@ -93,9 +93,9 @@ class UserQuotaManager:
         query = """
             UPDATE user_sessions
             SET today_usage = 0,
-                quota_reset_at = date('now'),
-                last_active_at = datetime('now')
-            WHERE user_id = ?
+                quota_reset_at = CURRENT_DATE,
+                last_active_at = NOW()
+            WHERE user_id = $1
         """
         await db.execute(query, user_id)
         logger.info(f"🔄 Reset quota for user: {user_id}")
@@ -106,8 +106,8 @@ class UserQuotaManager:
             UPDATE user_sessions
             SET today_usage = today_usage + 1,
                 total_searches = total_searches + 1,
-                last_active_at = datetime('now')
-            WHERE user_id = ?
+                last_active_at = NOW()
+            WHERE user_id = $1
         """
         await db.execute(query, user_id)
 
@@ -118,7 +118,7 @@ class UserQuotaManager:
     async def get_user_stats(self, user_id: str) -> dict:
         """Get user statistics"""
         try:
-            query = "SELECT * FROM user_sessions WHERE user_id = ?"
+            query = "SELECT * FROM user_sessions WHERE user_id = $1"
             user = await db.fetchrow(query, user_id)
 
             if not user:

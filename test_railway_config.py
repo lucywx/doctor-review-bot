@@ -82,16 +82,13 @@ async def test_config():
     # Test 4: Test database
     print("\n4️⃣ Testing database connection...")
     try:
-        if settings.environment == "production":
-            from src.database import db
-        else:
-            from src.database_sqlite import db
+        from src.database import db
 
         await db.connect()
         result = await db.fetchval("SELECT 1")
         await db.disconnect()
 
-        print(f"   ✅ Database connection working")
+        print(f"   ✅ Database connection working (PostgreSQL)")
 
     except Exception as e:
         print(f"   ❌ Database failed: {e}")

@@ -162,39 +162,11 @@ You'll be able to use the bot once approved."""
                 await whatsapp_client.send_message(from_number, response)
                 return
 
-            # Check if user has a pending specialty selection
-            from src.models.user_session import user_session_manager
-            pending_search = user_session_manager.get_pending_search(from_number)
-
-            if pending_search:
-                # User is replying with specialty selection
-                specialty = self._parse_specialty_input(message_text)
-                doctor_name = pending_search["doctor_name"]
-
-                # Complete the session
-                user_session_manager.complete_search(from_number)
-
-                # Check user quota
-                from src.models.user import user_quota_manager
-                quota_status = await user_quota_manager.check_and_update_quota(from_number)
-
-                if not quota_status.get("allowed", True):
-                    response = format_error_message("quota_exceeded")
-                    await whatsapp_client.send_message(from_number, response)
-                    return
-
-                # Proceed to search with specialty (empty string if user skipped)
-                await self._perform_search(from_number, doctor_name, specialty)
-                return
-
-            # No pending search - check if user provided complete input
-            # Try to extract both name and specialty from message
-            doctor_info = self._extract_doctor_info(message_text)
-            doctor_name = doctor_info.get("name")
-            specialty = doctor_info.get("specialty", "")
+            # User sent a doctor name - search directly (no specialty selection needed)
+            doctor_name = message_text.strip()
 
             # Reject single digits or single characters as doctor names
-            if not doctor_name or len(doctor_name.strip()) <= 1:
+            if len(doctor_name) <= 1:
                 response = format_error_message("invalid_input")
                 await whatsapp_client.send_message(from_number, response)
                 return
@@ -208,8 +180,8 @@ You'll be able to use the bot once approved."""
                 await whatsapp_client.send_message(from_number, response)
                 return
 
-            # Simple strategy: Always search directly (specialty is optional)
-            await self._perform_search(from_number, doctor_name, specialty)
+            # Search directly - no specialty needed
+            await self._perform_search(from_number, doctor_name)
             return
 
         except Exception as e:
@@ -306,14 +278,13 @@ You'll be able to use the bot once approved."""
         logger.info(f"User input not recognized, using as-is: {text}")
         return text
 
-    async def _perform_search(self, from_number: str, doctor_name: str, specialty: str = ""):
+    async def _perform_search(self, from_number: str, doctor_name: str):
         """
         Perform doctor review search and send results
 
         Args:
             from_number: User's phone number
             doctor_name: Doctor's name
-            specialty: Optional specialty
         """
         try:
             # Send processing message
@@ -326,8 +297,8 @@ You'll be able to use the bot once approved."""
             import time
             start_time = time.time()
 
-            # Search for doctor reviews
-            reviews = await self._search_doctor_reviews(doctor_name, specialty)
+            # Search for doctor reviews (no specialty needed)
+            reviews = await self._search_doctor_reviews(doctor_name)
 
             # Calculate response time
             response_time_ms = int((time.time() - start_time) * 1000)
@@ -442,28 +413,23 @@ You'll be able to use the bot once approved."""
             "specialty": specialty
         }
 
-    async def _search_doctor_reviews(self, doctor_name: str, specialty: str = "") -> list:
+    async def _search_doctor_reviews(self, doctor_name: str) -> list:
         """
-        Search for doctor reviews using real search engines
+        Search for doctor reviews using Google Custom Search
 
         Args:
             doctor_name: Doctor's name
-            specialty: Optional medical specialty
 
         Returns:
             List of review dicts
         """
         from src.search.aggregator import search_aggregator
 
-        if specialty:
-            logger.info(f"🔍 Searching for reviews: {doctor_name} ({specialty})")
-        else:
-            logger.info(f"🔍 Searching for reviews: {doctor_name}")
+        logger.info(f"🔍 Searching for reviews: {doctor_name}")
 
-        # Use search aggregator with specialty
+        # Use search aggregator (no specialty needed)
         result = await search_aggregator.search_doctor_reviews(
-            doctor_name=doctor_name,
-            specialty=specialty
+            doctor_name=doctor_name
         )
 
         return result.get("reviews", [])

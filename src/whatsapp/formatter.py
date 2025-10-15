@@ -46,27 +46,29 @@ _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
     display_reviews = sorted_reviews[:8]
 
     for i, review in enumerate(display_reviews, 1):
-        # Limit to ~2 lines on mobile (approx 75 chars)
-        snippet = review.get("snippet", "")[:75]
-        author = review.get("author_name", "")
+        snippet = review.get("snippet", "")
         date = review.get("review_date", "")
         url = review.get("url", "")
-        rating = review.get("rating")
 
-        # Format review content with quotes
-        message += f'{i}. "{snippet}..."\n'
+        # Truncate snippet to approximately 2 lines (150 chars for mobile)
+        # This allows roughly 75 chars per line on most mobile screens
+        max_length = 150
+        if len(snippet) > max_length:
+            truncated_snippet = snippet[:max_length].rstrip()
+            # Ensure we don't cut in the middle of a word
+            last_space = truncated_snippet.rfind(' ')
+            if last_space > max_length - 20:  # Only if last space is reasonably close
+                truncated_snippet = truncated_snippet[:last_space]
+            snippet_display = f"{truncated_snippet}..."
+        else:
+            snippet_display = snippet
 
-        # Compact metadata line with emojis and pipe separator
-        metadata_parts = []
-        if author and author != "Anonymous":
-            metadata_parts.append(f"👤 {author}")
+        # Format review with number
+        message += f'{i}. "{snippet_display}"\n'
+
+        # Add date if available
         if date:
-            metadata_parts.append(f"📅 {date}")
-        if rating and rating > 0:
-            metadata_parts.append(f"⭐ {rating}")
-
-        if metadata_parts:
-            message += f"    {' | '.join(metadata_parts)}\n"
+            message += f"    📅 {date}\n"
 
         # Add URL with emoji - disable WhatsApp link preview
         if url and len(url) > 10:
@@ -93,22 +95,17 @@ def format_welcome_message() -> str:
     """Welcome message for new users"""
     return """👋 Welcome to Doctor Review Bot!
 
-*Two ways to search:*
+📝 *How to use:*
+Simply send the doctor's full name
 
-*Option 1: Quick search*
-Send doctor's name + specialty together
-Example: `Dr. Smith, Cardiology`
+*Examples:*
+• Dr. Tang Boon Nee
+• Dr. Smith
+• Dr. Johnson
 
-*Option 2: Step-by-step*
-1. Send just the doctor's name: `Dr. Smith`
-2. Choose specialty from our list (38 options)
-3. Or skip specialty selection
+🔍 We'll search Google Maps, Facebook, forums, and healthcare sites for patient reviews.
 
-*Supported formats:*
-• Dr. Smith, Cardiology
-• Dr. Johnson | Pediatrics
-• Dr. Williams - Dermatology
-• Dr. Smith (bot will ask for specialty)"""
+⚡ *Daily limit:* 50 searches"""
 
 
 def format_error_message(error_type: str = "general") -> str:

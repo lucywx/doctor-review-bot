@@ -119,15 +119,32 @@ Search ALL these Malaysian sources:
 7. Medical directories and professional profiles
 8. Malaysian healthcare blogs
 
-Return JSON array (even if only 1 review found):
-[{{"source":"Google Maps","snippet":"review text","author_name":"name","review_date":"2023-01-01","rating":4.5,"url":"https://..."}}]
+YOU MUST return a valid JSON object with this EXACT structure:
+{{
+  "reviews": [
+    {{
+      "snippet": "Full original review text content",
+      "review_date": "YYYY-MM-DD",
+      "url": "https://full-url-to-original-review"
+    }}
+  ]
+}}
 
-IMPORTANT: Include ALL reviews found, even brief mentions or single reviews.
-Return empty array only if absolutely nothing found: []"""
+CRITICAL REQUIREMENTS:
+- Return a JSON object with "reviews" array, NOT plain text
+- snippet: Full original review text (will be truncated to 2 lines in display)
+- review_date: Date in YYYY-MM-DD format
+- url: Valid URL starting with http:// or https://
+- Include ALL reviews found
+- If no reviews found, return: {{"reviews": []}}
+
+Do NOT return explanations or summaries. ONLY return the JSON object."""
 
             logger.info(f"🌐 Calling OpenAI web search...")
 
             # Call OpenAI API
+            # Note: Responses API doesn't support response_format parameter
+            # We rely on strong prompt instructions for JSON output
             response = await self.client.responses.create(
                 model="gpt-4o-mini",
                 tools=[{"type": "web_search"}],
@@ -214,38 +231,41 @@ Return empty array only if absolutely nothing found: []"""
             # Try to parse as JSON
             if json_content:
                 try:
-                    reviews_data = json.loads(json_content)
+                    parsed_data = json.loads(json_content)
                     reviews = []
+
+                    # Handle new format: {"reviews": [...]}
+                    if isinstance(parsed_data, dict) and "reviews" in parsed_data:
+                        reviews_data = parsed_data["reviews"]
+                    # Handle legacy array format: [...]
+                    elif isinstance(parsed_data, list):
+                        reviews_data = parsed_data
+                    else:
+                        logger.warning(f"⚠️ Unexpected JSON structure: {type(parsed_data)}")
+                        reviews_data = []
 
                     for review_data in reviews_data:
                         if isinstance(review_data, dict):
                             # Validate URL first - CRITICAL for avoiding defamation risk
                             url = review_data.get("url") or ""
-                            source = review_data.get("source", "web_search")
 
                             # CRITICAL: Validate URL format
                             # OpenAI sometimes returns descriptions instead of actual URLs
                             if not url or not url.startswith(("http://", "https://")):
-                                logger.warning(f"⚠️ Skipping review from {source}: Invalid/missing URL: {url[:50] if url else 'None'}")
+                                logger.warning(f"⚠️ Skipping review: Invalid/missing URL: {url[:50] if url else 'None'}")
                                 continue
 
-                            # Step 1: Fast blacklist check (0ms)
+                            # Fast blacklist check
                             if self._is_blacklisted_domain(url):
                                 logger.warning(f"⚠️ Skipping review from blacklisted domain: {url}")
-                                continue  # SKIP - known defunct/spam domain
+                                continue
 
-                            # Collect review for batch validation
-                            rating = review_data.get("rating")
-                            rating = float(rating) if rating is not None else 0.0
-
+                            # Extract review data
                             reviews.append({
                                 "doctor_name": doctor_name,
-                                "source": source,
                                 "url": url,
                                 "snippet": review_data.get("snippet", ""),
-                                "rating": rating,
                                 "review_date": review_data.get("review_date") or "",
-                                "author_name": review_data.get("author_name") or "Anonymous",
                                 "sentiment": None  # Will be analyzed later
                             })
 
@@ -260,12 +280,9 @@ Return empty array only if absolutely nothing found: []"""
                 # Create a single review from the content
                 reviews = [{
                     "doctor_name": doctor_name,
-                    "source": "knowledge_base",
                     "url": "",
                     "snippet": content[:300],
-                    "rating": 4.0,
                     "review_date": "2025-01-01",
-                    "author_name": "OpenAI Knowledge",
                     "sentiment": None
                 }]
                 logger.info(f"✅ Created 1 review from text content")

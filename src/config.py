@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4-turbo", env="OPENAI_MODEL")
 
+    # Google Custom Search API
+    google_search_api_key: Optional[str] = Field(None, env="GOOGLE_SEARCH_API_KEY")
+    google_search_engine_id: Optional[str] = Field(None, env="GOOGLE_SEARCH_ENGINE_ID")
+
     # Application Settings
     environment: str = Field(default="development", env="ENVIRONMENT")
     debug: bool = Field(default=False, env="DEBUG")
