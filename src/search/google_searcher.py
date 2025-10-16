@@ -92,17 +92,23 @@ class GoogleSearcher:
         self.search_engine_id = settings.google_search_engine_id
         self.base_url = "https://www.googleapis.com/customsearch/v1"
 
-        # Target sites for doctor reviews
-        # Focus on community forums, social media, and Google Maps reviews
-        # Include LinkedIn for professional complaints and testimonials
-        # Exclude directory sites (aestheticsadvisor, whatclinic) as they rarely have genuine reviews
-        self.target_sites = [
-            "facebook.com",
-            "linkedin.com",        # Professional network - includes formal complaints and testimonials
-            "forum.lowyat.net",
-            "cari.com.my",
-            "maps.google.com",
-            "google.com/maps"
+        # Blacklist: Sites to exclude from search results
+        # These sites typically don't contain genuine patient reviews
+        self.excluded_sites = [
+            # Doctor directory sites (listing/promotional content only)
+            "aestheticsadvisor.com",
+            "whatclinic.com",
+            "vaidam.com",
+            "medsurgeindia.com",
+            "medifee.com",
+            "practo.com",
+
+            # Hospital official websites (not patient reviews)
+            "sunway.com.my",
+            "gleneagles.com.my",
+            "sjmc.com.my",
+            "columbiaasiahospitals.com",
+            "pantai.com.my",
         ]
 
     async def search_doctor_reviews(
@@ -112,7 +118,10 @@ class GoogleSearcher:
         location: str = ""
     ) -> Dict:
         """
-        Search for doctor reviews using Google Custom Search
+        Search for doctor reviews using Google Custom Search (entire web)
+
+        Strategy: Search entire web, then filter out blacklisted sites
+        This ensures we don't miss reviews on new/unlisted platforms
 
         Args:
             doctor_name: Doctor's name
@@ -132,25 +141,31 @@ class GoogleSearcher:
                     "error": "API credentials not configured"
                 }
 
-            # Build search query
+            # Build search query (no site restriction - search entire web)
             query = self._build_query(doctor_name, specialty, location)
 
-            # Search across target sites
-            urls = []
-            for site in self.target_sites:
-                site_urls = await self._search_site(query, site)
-                urls.extend(site_urls)
+            # Perform web-wide search (no site: restriction)
+            all_urls = await self._search_web(query, num_results=30)
 
-                # Limit total URLs
-                if len(urls) >= 30:
-                    break
+            # Filter out blacklisted sites
+            filtered_urls = []
+            for url_dict in all_urls:
+                url = url_dict.get("url", "")
 
-            logger.info(f"🔍 Google Search found {len(urls)} URLs for: {doctor_name}")
+                # Check if URL contains any blacklisted domain
+                is_blacklisted = any(excluded in url.lower() for excluded in self.excluded_sites)
+
+                if not is_blacklisted:
+                    filtered_urls.append(url_dict)
+                else:
+                    logger.debug(f"⏭️ Filtered blacklisted site: {url[:60]}...")
+
+            logger.info(f"🔍 Google Search found {len(filtered_urls)} URLs (filtered from {len(all_urls)}) for: {doctor_name}")
 
             return {
                 "source": "google_custom_search",
-                "urls": urls,
-                "total_count": len(urls),
+                "urls": filtered_urls,
+                "total_count": len(filtered_urls),
                 "query": query
             }
 
@@ -181,56 +196,66 @@ class GoogleSearcher:
 
         return " ".join(query_parts)
 
-    async def _search_site(self, query: str, site: str, num_results: int = 10) -> List[Dict]:
+    async def _search_web(self, query: str, num_results: int = 30) -> List[Dict]:
         """
-        Search a specific site
+        Search entire web (no site restriction)
 
         Args:
             query: Search query
-            site: Site to search (e.g., "facebook.com")
-            num_results: Number of results to fetch
+            num_results: Number of results to fetch (max 30)
 
         Returns:
             List of URL dicts with metadata
         """
         try:
-            # Add site restriction to query
-            site_query = f"{query} site:{site}"
+            # Search entire web (no site: restriction)
+            # Google API allows max 10 results per request, so we need multiple requests
+            all_urls = []
 
-            params = {
-                "key": self.api_key,
-                "cx": self.search_engine_id,
-                "q": site_query,
-                "num": min(num_results, 10)  # Max 10 per request
-            }
+            # Make up to 3 requests to get 30 results (10 per request)
+            for start_index in range(1, min(num_results, 30) + 1, 10):
+                params = {
+                    "key": self.api_key,
+                    "cx": self.search_engine_id,
+                    "q": query,
+                    "num": 10,
+                    "start": start_index  # Pagination: 1, 11, 21
+                }
 
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(self.base_url, params=params)
-                response.raise_for_status()
-                data = response.json()
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.get(self.base_url, params=params)
+                    response.raise_for_status()
+                    data = response.json()
 
-            # Extract URLs and metadata
-            urls = []
-            for item in data.get("items", []):
-                urls.append({
-                    "url": item.get("link"),
-                    "title": item.get("title"),
-                    "snippet": item.get("snippet"),
-                    "source": site
-                })
+                # Extract URLs and metadata
+                items = data.get("items", [])
+                if not items:
+                    break  # No more results
 
-            logger.debug(f"Found {len(urls)} results from {site}")
-            return urls
+                for item in items:
+                    all_urls.append({
+                        "url": item.get("link"),
+                        "title": item.get("title"),
+                        "snippet": item.get("snippet"),
+                        "source": "web"
+                    })
+
+                # If we got fewer than 10 results, there are no more pages
+                if len(items) < 10:
+                    break
+
+            logger.debug(f"Found {len(all_urls)} results from web search")
+            return all_urls
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 logger.warning(f"Google API rate limit exceeded")
             else:
-                logger.error(f"HTTP error searching {site}: {e}")
+                logger.error(f"HTTP error in web search: {e}")
             return []
 
         except Exception as e:
-            logger.error(f"Error searching {site}: {e}")
+            logger.error(f"Error in web search: {e}")
             return []
 
     async def extract_content_with_openai(self, urls: List[Dict], doctor_name: str) -> Dict:
