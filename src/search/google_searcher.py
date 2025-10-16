@@ -209,15 +209,28 @@ class GoogleSearcher:
                     if len(parts) > 1:
                         path = parts[1].split('/')[0].split('?')[0]  # Get first segment, remove query params
 
-                        # Check if path contains hospital/medical/clinic keywords
-                        hospital_keywords = [
-                            'hospital', 'medical', 'medicalcentre',
-                            'clinic', 'healthcare', 'health',
-                            'mncc', 'gleneagles', 'pantai', 'sunway'
+                        # Check if path contains specific hospital names (Malaysia major hospitals)
+                        hospital_names = [
+                            'gleneagles',           # Gleneagles Hospital
+                            'pantai',               # Pantai Hospital
+                            'sunway',               # Sunway Medical Centre
+                            'subangjaya',           # Subang Jaya Medical Centre
+                            'sjmc',                 # Subang Jaya Medical Centre abbreviation
+                            'sdmc',                 # Sime Darby Medical Centre
+                            'prince court',         # Prince Court Medical Centre
+                            'princecourt',
+                            'mncc',                 # Malaysia National Cancer Council
+                            'ummc',                 # University Malaya Medical Centre
+                            'kpj',                  # KPJ Healthcare
+                            'tmc',                  # TMC (Tropicana Medical Centre)
+                            'columbiasia',          # Columbia Asia Hospital
+                            'adventist',            # Adventist Hospital
+                            'tung shin',            # Tung Shin Hospital
+                            'tungshin'
                         ]
 
-                        # If path contains hospital keywords, it's likely an official page
-                        if any(keyword in path for keyword in hospital_keywords):
+                        # If path contains hospital name, it's likely an official page
+                        if any(name in path for name in hospital_names):
                             # Exception: groups are OK (even if hospital-related)
                             if path != 'groups':
                                 logger.info(f"⏭️ Skipping Facebook official hospital page: {url[:70]}...")
