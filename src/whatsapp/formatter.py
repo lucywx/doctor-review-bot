@@ -147,10 +147,9 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
             message += f"   📅 {review_date}\n"
 
         if url and len(url) > 10:
-            clean_url = url.replace("https://", "").replace("http://", "")
-            if len(clean_url) > 50:
-                clean_url = clean_url[:47] + "..."
-            message += f"   🔗 {clean_url}\n"
+            # Always include full URL for WhatsApp to parse correctly
+            # WhatsApp will auto-convert it to a clickable link
+            message += f"   🔗 {url}\n"
 
         # No blank line between reviews to save space
 
