@@ -304,14 +304,18 @@ class GoogleSearcher:
                     extraction_prompt = f"""Analyze this webpage and extract ONLY genuine patient reviews about {doctor_name}.
 
 Rules:
-- ONLY include actual patient experiences and reviews
+- ONLY include actual patient experiences and reviews ABOUT {doctor_name}
 - EXCLUDE doctor bios, introductions, and professional descriptions
 - EXCLUDE hospital promotional content
 - EXCLUDE "About the doctor" sections
 - EXCLUDE directory listings and contact information
+- EXCLUDE reviews about OTHER doctors (not {doctor_name})
 
-For each genuine patient review found, extract:
-1. The full review text (patient's words)
+IMPORTANT: Each review snippet MUST mention "{doctor_name}" or clearly reference this specific doctor.
+If a review talks about a different doctor, DO NOT include it.
+
+For each genuine patient review found about {doctor_name}, extract:
+1. The full review text that mentions {doctor_name} (patient's words)
 2. Date (if available, in YYYY-MM-DD format)
 3. Author name (if available)
 
@@ -324,7 +328,7 @@ Return a JSON object with this EXACT structure:
 {{
   "reviews": [
     {{
-      "snippet": "Full patient review text here",
+      "snippet": "Full patient review text here that mentions {doctor_name}",
       "review_date": "YYYY-MM-DD or empty string",
       "author_name": "Name or empty string",
       "url": "{url}"
@@ -332,7 +336,7 @@ Return a JSON object with this EXACT structure:
   ]
 }}
 
-If NO genuine patient reviews are found, return: {{"reviews": []}}"""
+If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews": []}}"""
 
                     # Call GPT-4 for analysis
                     completion = await openai_client.chat.completions.create(
