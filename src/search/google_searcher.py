@@ -94,9 +94,11 @@ class GoogleSearcher:
 
         # Target sites for doctor reviews
         # Focus on community forums, social media, and Google Maps reviews
+        # Include LinkedIn for professional complaints and testimonials
         # Exclude directory sites (aestheticsadvisor, whatclinic) as they rarely have genuine reviews
         self.target_sites = [
             "facebook.com",
+            "linkedin.com",        # Professional network - includes formal complaints and testimonials
             "forum.lowyat.net",
             "cari.com.my",
             "maps.google.com",
