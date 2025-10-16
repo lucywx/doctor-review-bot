@@ -92,6 +92,17 @@ class GoogleSearcher:
         self.search_engine_id = settings.google_search_engine_id
         self.base_url = "https://www.googleapis.com/customsearch/v1"
 
+        # Priority sites: High-quality review platforms (searched first, results boosted)
+        # These sites consistently have genuine patient reviews and discussions
+        self.priority_sites = [
+            "forum.lowyat.net",      # Malaysia's largest tech/general forum - active medical discussions
+            "cari.com.my",           # Popular Malaysian community forum
+            "facebook.com",          # Social media - groups and posts
+            "linkedin.com",          # Professional network - formal complaints
+            "google.com/maps",       # Google Maps reviews
+            "maps.google.com",       # Google Maps reviews (alternate domain)
+        ]
+
         # Blacklist: Sites to exclude from search results
         # These sites typically don't contain genuine patient reviews
         self.excluded_sites = [
@@ -118,10 +129,13 @@ class GoogleSearcher:
         location: str = ""
     ) -> Dict:
         """
-        Search for doctor reviews using Google Custom Search (entire web)
+        Search for doctor reviews using hybrid strategy:
+        1. Priority sites search (high-quality platforms like Lowyat, Cari)
+        2. Web-wide search (discover new platforms)
+        3. Merge and deduplicate
+        4. Blacklist filtering
 
-        Strategy: Search entire web, then filter out blacklisted sites
-        This ensures we don't miss reviews on new/unlisted platforms
+        This ensures we get best results from known platforms while not missing new ones
 
         Args:
             doctor_name: Doctor's name
@@ -141,11 +155,40 @@ class GoogleSearcher:
                     "error": "API credentials not configured"
                 }
 
-            # Build search query (no site restriction - search entire web)
+            # Build search query
             query = self._build_query(doctor_name, specialty, location)
 
-            # Perform web-wide search (no site: restriction)
-            all_urls = await self._search_web(query, num_results=30)
+            # Phase 1: Search priority sites (get ~15 results, ~2-3 per site)
+            priority_urls = []
+            for site in self.priority_sites:
+                site_results = await self._search_site(query, site, num_results=3)
+                priority_urls.extend(site_results)
+
+            logger.info(f"📌 Priority sites search: {len(priority_urls)} URLs from {len(self.priority_sites)} sites")
+
+            # Phase 2: Web-wide search (get remaining results to reach ~30 total)
+            remaining_needed = max(30 - len(priority_urls), 10)  # Get at least 10 from web
+            web_urls = await self._search_web(query, num_results=remaining_needed)
+
+            logger.info(f"🌐 Web-wide search: {len(web_urls)} URLs")
+
+            # Merge and deduplicate (priority URLs come first)
+            seen_urls = set()
+            all_urls = []
+
+            # Add priority URLs first (these rank higher)
+            for url_dict in priority_urls:
+                url = url_dict.get("url", "")
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    all_urls.append(url_dict)
+
+            # Add web URLs (only if not already seen)
+            for url_dict in web_urls:
+                url = url_dict.get("url", "")
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    all_urls.append(url_dict)
 
             # Filter out blacklisted sites
             filtered_urls = []
@@ -160,7 +203,7 @@ class GoogleSearcher:
                 else:
                     logger.debug(f"⏭️ Filtered blacklisted site: {url[:60]}...")
 
-            logger.info(f"🔍 Google Search found {len(filtered_urls)} URLs (filtered from {len(all_urls)}) for: {doctor_name}")
+            logger.info(f"🔍 Final results: {len(filtered_urls)} URLs ({len(priority_urls)} priority + {len(web_urls)} web, {len(all_urls) - len(filtered_urls)} filtered)")
 
             return {
                 "source": "google_custom_search",
@@ -195,6 +238,58 @@ class GoogleSearcher:
         query_parts.append("(review OR reviews OR testimonial OR feedback OR experience OR complaint OR lawsuit OR sued OR malpractice OR negligence)")
 
         return " ".join(query_parts)
+
+    async def _search_site(self, query: str, site: str, num_results: int = 3) -> List[Dict]:
+        """
+        Search a specific site (for priority site targeting)
+
+        Args:
+            query: Search query
+            site: Site to search (e.g., "forum.lowyat.net")
+            num_results: Number of results to fetch (default 3)
+
+        Returns:
+            List of URL dicts with metadata
+        """
+        try:
+            # Add site restriction to query
+            site_query = f"{query} site:{site}"
+
+            params = {
+                "key": self.api_key,
+                "cx": self.search_engine_id,
+                "q": site_query,
+                "num": min(num_results, 10)  # Max 10 per request
+            }
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(self.base_url, params=params)
+                response.raise_for_status()
+                data = response.json()
+
+            # Extract URLs and metadata
+            urls = []
+            for item in data.get("items", []):
+                urls.append({
+                    "url": item.get("link"),
+                    "title": item.get("title"),
+                    "snippet": item.get("snippet"),
+                    "source": site
+                })
+
+            logger.debug(f"Found {len(urls)} results from {site}")
+            return urls
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                logger.warning(f"Google API rate limit exceeded")
+            else:
+                logger.error(f"HTTP error searching {site}: {e}")
+            return []
+
+        except Exception as e:
+            logger.error(f"Error searching {site}: {e}")
+            return []
 
     async def _search_web(self, query: str, num_results: int = 30) -> List[Dict]:
         """
