@@ -116,6 +116,11 @@ class GoogleSearcher:
             "onedaymd.com",          # Medical directory/listing site
             "scribd.com",             # Document sharing (often just lists)
             "theasianparent.com",     # Parenting forum (low-quality, generic discussions)
+            "medisata.com",          # Indonesian doctor directory
+            "tripmedis.id",          # Indonesian medical tourism directory
+            "kinderasia.com",        # Doctor directory/booking
+            "pantangplus.com",       # Hospital package promotional site
+            "berobatkemelaka.com",   # Indonesian medical tourism site
 
             # Hospital official websites (not patient reviews)
             "sunway.com.my",
@@ -563,11 +568,59 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
                             'internal:',          # Staff listings
                             'assoc. prof.',       # Academic listings
                             'fke.postgraduate',   # Academic pages
-                            'aestheticsadvisor'   # Directory site
+                            'aestheticsadvisor',  # Directory site
+                            'professional registration', # Doctor bio pages
+                            'lulusan',            # Indonesian doctor directory (educational background)
+                            'pakar program',      # Doctor specialty programs
+                            'dokter spesialis',   # Indonesian (specialist doctor)
+                            'adalah dokter',      # Indonesian (is a doctor)
+                            'doctor registration', # Registration pages
+                            'years of experience', # Bio pages
+                            'graduated from',     # Educational background
+                            'tak pernah jumpa',   # Malay: never met (not a real review)
+                            'never met',          # English: never met
+                            'consultation hours', # Doctor directory info
+                            'office hours',
+                            'bilik:',             # Malay: room number (directory info)
+                            'phone:',
+                            'extension no',
                         ]
 
                         if any(pattern in snippet_lower for pattern in skip_patterns):
-                            logger.debug(f"⏭️ Fallback: Skipping directory/address content: {snippet[:50]}...")
+                            logger.debug(f"⏭️ Fallback: Skipping directory/bio content: {snippet[:50]}...")
+                            continue
+
+                        # CRITICAL: Check if snippet contains actual review language
+                        # Only accept snippets that show patient experiences, not just doctor mentions
+                        review_indicators = [
+                            # Malay/Indonesian review keywords
+                            'saya',              # I (first person - indicates patient experience)
+                            'aku',               # I (informal)
+                            'recommended',       # Recommendation
+                            'recommend',
+                            'sangat bagus',      # Very good
+                            'doktor tu',         # That doctor (informal discussion)
+                            'pengalaman',        # Experience (when combined with first person)
+
+                            # English review keywords
+                            'went to',           # Patient action
+                            'visited',
+                            'my experience',
+                            'i went',
+                            'saw dr',
+                            'he/she was',
+                            'very good',
+                            'excellent',
+                            'terrible',
+                            'complaint',
+                            'helped me',
+                        ]
+
+                        # Check if snippet contains at least one review indicator
+                        has_review_language = any(indicator in snippet_lower for indicator in review_indicators)
+
+                        if not has_review_language:
+                            logger.debug(f"⏭️ Fallback: Skipping non-review snippet (no patient experience language): {snippet[:50]}...")
                             continue
 
                         if key_name in snippet_lower:
