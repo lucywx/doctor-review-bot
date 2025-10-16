@@ -200,6 +200,30 @@ class GoogleSearcher:
                 if not url:
                     continue
 
+                # Skip Facebook official hospital pages
+                # Pattern: facebook.com/hospitalname/ (where hospitalname contains medical keywords)
+                url_lower = url.lower()
+                if 'facebook.com/' in url_lower:
+                    # Extract the path after facebook.com/
+                    parts = url_lower.split('facebook.com/')
+                    if len(parts) > 1:
+                        path = parts[1].split('/')[0].split('?')[0]  # Get first segment, remove query params
+
+                        # Check if path contains hospital/medical/clinic keywords
+                        hospital_keywords = [
+                            'hospital', 'medical', 'medicalcentre',
+                            'clinic', 'healthcare', 'health',
+                            'mncc', 'gleneagles', 'pantai', 'sunway'
+                        ]
+
+                        # If path contains hospital keywords, it's likely an official page
+                        if any(keyword in path for keyword in hospital_keywords):
+                            # Exception: groups are OK (even if hospital-related)
+                            if path != 'groups':
+                                logger.info(f"⏭️ Skipping Facebook official hospital page: {url[:70]}...")
+                                failed_urls.append(url_dict)
+                                continue
+
                 try:
                     # Fetch HTML content with shorter timeout
                     async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
