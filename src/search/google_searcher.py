@@ -417,10 +417,34 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
                     # Filter: Only use snippets that mention the doctor's name
                     if snippet and len(snippet) > 20:  # Only use meaningful snippets
                         if key_name in snippet.lower():
+                            # Try to extract date from snippet text
+                            import re
+                            from datetime import datetime
+
+                            extracted_date = ""
+                            # Pattern 1: "Nov 17, 2020" or "Jun 23, 2020"
+                            date_match = re.search(r'([A-Z][a-z]{2})\s+(\d{1,2}),\s+(\d{4})', snippet)
+                            if date_match:
+                                try:
+                                    month_str = date_match.group(1)
+                                    day = date_match.group(2)
+                                    year = date_match.group(3)
+                                    # Parse date
+                                    parsed_date = datetime.strptime(f"{month_str} {day} {year}", "%b %d %Y")
+                                    extracted_date = parsed_date.strftime("%Y-%m-%d")
+                                except ValueError:
+                                    pass
+
+                            # Pattern 2: "2013-08-21" (YYYY-MM-DD already formatted)
+                            if not extracted_date:
+                                date_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', snippet)
+                                if date_match:
+                                    extracted_date = date_match.group(0)
+
                             all_reviews.append({
                                 "snippet": snippet,
                                 "url": url,
-                                "review_date": "",
+                                "review_date": extracted_date,
                                 "author_name": "",
                                 "source": "google_snippet"
                             })
