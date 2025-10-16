@@ -92,6 +92,9 @@ class CacheManager:
             saved_count = 0
             valid_until = datetime.now() + timedelta(days=ttl_days)
 
+            # First, ensure doctor record exists (for foreign key constraint)
+            await self._ensure_doctor_exists(doctor_id, doctor_name)
+
             for review in reviews:
                 # Generate unique hash
                 content = f"{review.get('url', '')}|{review.get('snippet', '')}"
@@ -109,8 +112,14 @@ class CacheManager:
 
                 # Convert empty strings to None for database fields
                 review_date = review.get("review_date")
-                if review_date == "":
+                if review_date == "" or review_date is None:
                     review_date = None
+                elif isinstance(review_date, str):
+                    # Try to parse date string to datetime object
+                    try:
+                        review_date = datetime.strptime(review_date, "%Y-%m-%d").date()
+                    except ValueError:
+                        review_date = None
 
                 result = await db.execute(
                     query,
@@ -124,10 +133,10 @@ class CacheManager:
                     review.get("snippet"),
                     review.get("sentiment"),
                     review.get("rating"),
-                    review_date,  # Use None instead of empty string
+                    review_date,  # Use None or datetime.date object
                     review.get("author_name"),
                     hash_value,
-                    valid_until.isoformat(),
+                    valid_until,  # Use datetime object directly
                     None  # metadata as JSON
                 )
 
@@ -175,6 +184,25 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Error checking cache status: {e}")
             return {"cache_valid": False}
+
+    async def _ensure_doctor_exists(self, doctor_id: str, doctor_name: str):
+        """
+        Ensure doctor record exists in doctors table (for foreign key constraint)
+        
+        Args:
+            doctor_id: Doctor's unique identifier
+            doctor_name: Doctor's name
+        """
+        try:
+            # Try to insert doctor record, ignore if exists
+            query = """
+                INSERT INTO doctors (doctor_id, name, created_at, updated_at)
+                VALUES ($1, $2, NOW(), NOW())
+                ON CONFLICT (doctor_id) DO NOTHING
+            """
+            await db.execute(query, doctor_id, doctor_name)
+        except Exception as e:
+            logger.warning(f"Could not ensure doctor exists: {e}")
 
     def generate_doctor_id(self, name: str, hospital: str = "", location: str = "") -> str:
         """

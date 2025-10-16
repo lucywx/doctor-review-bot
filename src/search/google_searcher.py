@@ -185,8 +185,25 @@ class GoogleSearcher:
             start_time = time.time()
             max_processing_time = 25  # seconds (leave 5 seconds buffer for WhatsApp timeout)
 
+            # Prioritize forum URLs over Facebook official pages
+            def url_priority(url_dict):
+                url = url_dict.get("url", "").lower()
+                # Priority 1: Forum discussions (most likely to have reviews)
+                if any(forum in url for forum in ['lowyat.net', 'cari.com.my', '/groups/']):
+                    return 0
+                # Priority 2: Google Maps reviews
+                if 'maps.google.com' in url or 'google.com/maps' in url:
+                    return 1
+                # Priority 3: Other sources
+                # Skip official hospital pages (videos, photos, posts)
+                if any(skip in url for skip in ['/videos/', '/photos/', '/posts/', 'medicalcentre/videos', 'medicalcentre/photos']):
+                    return 999  # Put at end (likely won't be processed)
+                return 2
+
+            sorted_urls = sorted(urls[:15], key=url_priority)
+
             # Process URLs - try GPT-4 extraction first
-            for url_dict in urls[:15]:  # Process up to 15 URLs
+            for url_dict in sorted_urls:
                 # Check if we're approaching timeout
                 elapsed = time.time() - start_time
                 if elapsed > max_processing_time:
