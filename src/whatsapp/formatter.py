@@ -67,14 +67,10 @@ _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
         # Format review entry
         review_entry = f'{i}. "{snippet_display}"\n'
 
-        # Add URL (shortened) - no date to save space
+        # Add URL - send full URL so WhatsApp can parse correctly
         if url and len(url) > 10:
-            # Shorten URL to domain + path
-            clean_url = url.replace("https://", "").replace("http://", "")
-            # Truncate very long URLs
-            if len(clean_url) > 50:
-                clean_url = clean_url[:47] + "..."
-            review_entry += f"   🔗 {clean_url}\n"
+            # WhatsApp will auto-convert full URLs to clickable links
+            review_entry += f"   🔗 {url}\n"
 
         review_entry += "\n"
 

@@ -113,6 +113,9 @@ class GoogleSearcher:
             "medsurgeindia.com",
             "medifee.com",
             "practo.com",
+            "onedaymd.com",          # Medical directory/listing site
+            "scribd.com",             # Document sharing (often just lists)
+            "theasianparent.com",     # Parenting forum (low-quality, generic discussions)
 
             # Hospital official websites (not patient reviews)
             "sunway.com.my",
