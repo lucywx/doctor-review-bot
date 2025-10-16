@@ -355,13 +355,29 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
                     reviews = result.get("reviews", [])
 
                     if reviews:
-                        # Add source metadata
-                        for review in reviews:
-                            review["source"] = "google_custom_search + gpt4_extraction"
-                            review["url"] = url  # Ensure URL is present
+                        # Filter reviews to ensure they mention the doctor's name
+                        # Extract key name parts (handle "Dr Tang Boon Nee" → check for "tang")
+                        name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
+                        # Use last name (usually first word after removing "Dr")
+                        key_name = name_parts[0] if name_parts else doctor_name.lower()
 
-                        all_reviews.extend(reviews)
-                        logger.info(f"📄 Extracted {len(reviews)} reviews from {url}")
+                        relevant_reviews = []
+                        for review in reviews:
+                            snippet = review.get("snippet", "").lower()
+                            # Check if snippet mentions the key name
+                            if key_name in snippet:
+                                review["source"] = "google_custom_search + gpt4_extraction"
+                                review["url"] = url  # Ensure URL is present
+                                relevant_reviews.append(review)
+                            else:
+                                logger.debug(f"⏭️ Filtered out review without '{key_name}': {snippet[:50]}...")
+
+                        if relevant_reviews:
+                            all_reviews.extend(relevant_reviews)
+                            logger.info(f"📄 Extracted {len(relevant_reviews)}/{len(reviews)} relevant reviews from {url}")
+                        else:
+                            logger.warning(f"⚠️ GPT-4 extracted {len(reviews)} reviews but none mention '{doctor_name}'")
+                            failed_urls.append(url_dict)
                     else:
                         # GPT-4 found no reviews - mark for fallback
                         logger.warning(f"⚠️ GPT-4 found no reviews in {url}")
