@@ -10,6 +10,80 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
+# Malaysia Top 50 Hospital Names for filtering official Facebook pages
+# This list is used to identify and skip hospital official pages (e.g., facebook.com/sunway/)
+# while allowing patient review content (e.g., facebook.com/groups/...)
+MALAYSIA_HOSPITAL_NAMES = [
+    # Top 10
+    'sunway',                   # Sunway Medical Centre
+    'gleneagles',               # Gleneagles Hospital KL
+    'subangjaya',               # Subang Jaya Medical Centre
+    'sjmc',                     # SJMC abbreviation
+    'hkl',                      # Hospital Kuala Lumpur
+    'princecourt',              # Prince Court Medical Centre
+    'prince court',
+    'pantai',                   # Pantai Hospital (multiple branches)
+    'island hospital',          # Island Hospital Penang
+    'islandhospital',
+
+    # Top 11-20
+    'kpj',                      # KPJ Healthcare (multiple branches)
+    'lohguan',                  # Loh Guan Lye
+    'penang adventist',         # Penang Adventist Hospital
+    'adventisthospital',
+    'sime darby',               # Sime Darby Medical Centre
+    'sdmc',
+    'tropicana',                # Tropicana Medical Centre
+    'beacon',                   # Beacon Hospital
+    'ipoh specialist',          # Ipoh Specialist Hospital
+    'ipohspecialist',
+    'normah',                   # Normah Medical Specialist Centre
+
+    # Top 21-30
+    'columbia asia',            # Columbia Asia (multiple branches)
+    'columbiasia',
+    'ummc',                     # University Malaya Medical Centre
+    'putra',                    # Putra Specialist Hospital
+    'putrajaya',                # Putrajaya Hospital
+    'melaka',                   # Melaka Hospital
+    'kuala lumpur',             # Hospital Kuala Lumpur
+    'ampang',                   # Ampang Hospital
+    'selayang',                 # Selayang Hospital
+    'tung shin',                # Tung Shin Hospital
+    'tungshin',
+
+    # Top 31-40
+    'mahkota',                  # Mahkota Medical Centre
+    'ara damansara',            # Ara Damansara Medical Centre
+    'aradamansara',
+    'tawakal',                  # Hospital Tawakal
+    'tuanku jaafar',            # Tuanku Ja'afar Hospital
+    'tuankujaafar',
+    'sultanah aminah',          # Hospital Sultanah Aminah
+    'sultanahaminah',
+    'tengku ampuan rahimah',    # Hospital Tengku Ampuan Rahimah
+    'htar',
+    'sultan ismail',            # Hospital Sultan Ismail
+    'sultanismail',
+
+    # Top 41-50
+    'sultanah bahiyah',         # Hospital Sultanah Bahiyah
+    'sultanahbahiyah',
+    'raja permaisuri bainun',   # Hospital Raja Permaisuri Bainun
+    'hrpb',
+    'bainun',
+    'tuanku fauziah',           # Hospital Tuanku Fauziah
+    'tuankufauziah',
+    'sultanah nur zahirah',     # Hospital Sultanah Nur Zahirah
+    'sultanahzahirah',
+    'duke',                     # Duke Medical Centre
+    'thomson',                  # Thomson Hospital
+    'assunta',                  # Assunta Hospital
+    'damansara specialist',     # Damansara Specialist Hospital
+    'damansaraspecialist'
+]
+
+
 class GoogleSearcher:
     """Search using Google Custom Search API"""
 
@@ -201,7 +275,6 @@ class GoogleSearcher:
                     continue
 
                 # Skip Facebook official hospital pages
-                # Pattern: facebook.com/hospitalname/ (where hospitalname contains medical keywords)
                 url_lower = url.lower()
                 if 'facebook.com/' in url_lower:
                     # Extract the path after facebook.com/
@@ -209,79 +282,8 @@ class GoogleSearcher:
                     if len(parts) > 1:
                         path = parts[1].split('/')[0].split('?')[0]  # Get first segment, remove query params
 
-                        # Check if path contains specific hospital names (Malaysia Top 50 hospitals)
-                        hospital_names = [
-                            # Top 10
-                            'sunway',                   # Sunway Medical Centre
-                            'gleneagles',               # Gleneagles Hospital KL
-                            'subangjaya',               # Subang Jaya Medical Centre
-                            'sjmc',                     # SJMC abbreviation
-                            'hkl',                      # Hospital Kuala Lumpur
-                            'princecourt',              # Prince Court Medical Centre
-                            'prince court',
-                            'pantai',                   # Pantai Hospital (multiple branches)
-                            'island hospital',          # Island Hospital Penang
-                            'islandhospital',
-
-                            # Top 11-20
-                            'kpj',                      # KPJ Healthcare (multiple branches)
-                            'lohguan',                  # Loh Guan Lye
-                            'penang adventist',         # Penang Adventist Hospital
-                            'adventisthospital',
-                            'sime darby',               # Sime Darby Medical Centre
-                            'sdmc',
-                            'tropicana',                # Tropicana Medical Centre
-                            'beacon',                   # Beacon Hospital
-                            'ipoh specialist',          # Ipoh Specialist Hospital
-                            'ipohspecialist',
-                            'normah',                   # Normah Medical Specialist Centre
-
-                            # Top 21-30
-                            'columbia asia',            # Columbia Asia (multiple branches)
-                            'columbiasia',
-                            'ummc',                     # University Malaya Medical Centre
-                            'putra',                    # Putra Specialist Hospital
-                            'putrajaya',                # Putrajaya Hospital
-                            'melaka',                   # Melaka Hospital
-                            'kuala lumpur',             # Hospital Kuala Lumpur
-                            'ampang',                   # Ampang Hospital
-                            'selayang',                 # Selayang Hospital
-                            'tung shin',                # Tung Shin Hospital
-                            'tungshin',
-
-                            # Top 31-40
-                            'mahkota',                  # Mahkota Medical Centre
-                            'ara damansara',            # Ara Damansara Medical Centre
-                            'aradamansara',
-                            'tawakal',                  # Hospital Tawakal
-                            'tuanku jaafar',            # Tuanku Ja'afar Hospital
-                            'tuankujaafar',
-                            'sultanah aminah',          # Hospital Sultanah Aminah
-                            'sultanahaminah',
-                            'tengku ampuan rahimah',    # Hospital Tengku Ampuan Rahimah
-                            'htar',
-                            'sultan ismail',            # Hospital Sultan Ismail
-                            'sultanismail',
-
-                            # Top 41-50
-                            'sultanah bahiyah',         # Hospital Sultanah Bahiyah
-                            'sultanahbahiyah',
-                            'raja permaisuri bainun',   # Hospital Raja Permaisuri Bainun
-                            'hrpb',
-                            'bainun',
-                            'tuanku fauziah',           # Hospital Tuanku Fauziah
-                            'tuankufauziah',
-                            'sultanah nur zahirah',     # Hospital Sultanah Nur Zahirah
-                            'sultanahzahirah',
-                            'duke',                     # Duke Medical Centre
-                            'thomson',                  # Thomson Hospital
-                            'assunta',                  # Assunta Hospital
-                            'damansara specialist',     # Damansara Specialist Hospital
-                            'damansaraspecialist'
-                        ]
-
                         # If path contains hospital name, it's likely an official page
-                        if any(name in path for name in hospital_names):
+                        if any(name in path for name in MALAYSIA_HOSPITAL_NAMES):
                             # Exception: groups are OK (even if hospital-related)
                             if path != 'groups':
                                 logger.info(f"⏭️ Skipping Facebook official hospital page: {url[:70]}...")
@@ -396,34 +398,18 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
                 name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
                 key_name = name_parts[0] if name_parts else doctor_name.lower()
 
-                # Hospital names for filtering (same list as GPT-4 extraction)
-                hospital_names = [
-                    'sunway', 'gleneagles', 'subangjaya', 'sjmc', 'hkl',
-                    'princecourt', 'prince court', 'pantai', 'island hospital', 'islandhospital',
-                    'kpj', 'lohguan', 'penang adventist', 'adventisthospital', 'sime darby',
-                    'sdmc', 'tropicana', 'beacon', 'ipoh specialist', 'ipohspecialist', 'normah',
-                    'columbia asia', 'columbiasia', 'ummc', 'putra', 'putrajaya', 'melaka',
-                    'kuala lumpur', 'ampang', 'selayang', 'tung shin', 'tungshin',
-                    'mahkota', 'ara damansara', 'aradamansara', 'tawakal', 'tuanku jaafar',
-                    'tuankujaafar', 'sultanah aminah', 'sultanahaminah', 'tengku ampuan rahimah',
-                    'htar', 'sultan ismail', 'sultanismail', 'sultanah bahiyah', 'sultanahbahiyah',
-                    'raja permaisuri bainun', 'hrpb', 'bainun', 'tuanku fauziah', 'tuankufauziah',
-                    'sultanah nur zahirah', 'sultanahzahirah', 'duke', 'thomson', 'assunta',
-                    'damansara specialist', 'damansaraspecialist'
-                ]
-
                 fallback_added = 0
                 for url_dict in failed_urls[:10]:  # Use up to 10 snippets as fallback
                     snippet = url_dict.get("snippet", "")
                     url = url_dict.get("url", "")
 
-                    # Skip Facebook official hospital pages
+                    # Skip Facebook official hospital pages (same logic as GPT-4 extraction)
                     url_lower = url.lower()
                     if 'facebook.com/' in url_lower:
                         parts = url_lower.split('facebook.com/')
                         if len(parts) > 1:
                             path = parts[1].split('/')[0].split('?')[0]
-                            if any(name in path for name in hospital_names):
+                            if any(name in path for name in MALAYSIA_HOSPITAL_NAMES):
                                 if path != 'groups':
                                     logger.debug(f"⏭️ Fallback: Skipping Facebook hospital page: {url[:70]}...")
                                     continue
