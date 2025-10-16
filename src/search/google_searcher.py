@@ -384,22 +384,17 @@ class GoogleSearcher:
 
             openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
             all_reviews = []
-            failed_to_fetch_urls = []  # URLs that failed to fetch (HTTP errors, timeout, etc.)
-            gpt4_found_no_reviews = []  # URLs that GPT-4 analyzed but found no reviews
-            verified_working_urls = set()  # URLs we successfully accessed (HTTP 200)
 
             # Track processing time to avoid timeout
             start_time = time.time()
             max_processing_time = 25  # seconds (leave 5 seconds buffer for WhatsApp timeout)
 
-            # Process URLs - try GPT-4 extraction first
+            # Process URLs with GPT-4 extraction
             for url_dict in urls[:15]:  # Process up to 15 URLs
                 # Check if we're approaching timeout
                 elapsed = time.time() - start_time
                 if elapsed > max_processing_time:
                     logger.warning(f"⏱️ Timeout approaching ({elapsed:.1f}s), stopping extraction")
-                    # Mark remaining URLs as failed to fetch (didn't have time to try)
-                    failed_to_fetch_urls.extend(urls[len(all_reviews):])
                     break
                 url = url_dict.get("url", "")
                 google_snippet = url_dict.get("snippet", "")
@@ -430,11 +425,8 @@ class GoogleSearcher:
 
                         if response.status_code != 200:
                             logger.warning(f"❌ HTTP {response.status_code} for {url}")
-                            failed_to_fetch_urls.append(url_dict)
                             continue
 
-                        # Mark this URL as working (successfully accessed)
-                        verified_working_urls.add(url)
                         html_content = response.text[:30000]  # Limit to 30k chars (balance between content and speed)
 
                     # Use GPT-4 to extract ONLY genuine patient reviews
@@ -514,156 +506,16 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
                             logger.info(f"📄 Extracted {len(relevant_reviews)}/{len(reviews)} relevant reviews from {url}")
                         else:
                             # GPT-4 extracted reviews but none mention doctor name
-                            logger.warning(f"⚠️ GPT-4 extracted {len(reviews)} reviews but none mention '{doctor_name}'")
-                            gpt4_found_no_reviews.append(url_dict)
+                            logger.debug(f"⏭️ GPT-4 extracted {len(reviews)} reviews but none mention '{doctor_name}'")
                     else:
                         # GPT-4 analyzed the page and found no patient reviews
-                        # Trust GPT-4's judgment - don't use fallback for these
-                        logger.info(f"✓ GPT-4 verified no patient reviews in {url}")
-                        gpt4_found_no_reviews.append(url_dict)
+                        logger.debug(f"⏭️ GPT-4 verified no patient reviews in {url}")
 
                 except Exception as e:
                     logger.warning(f"❌ Failed to extract from {url}: {e}")
-                    failed_to_fetch_urls.append(url_dict)
                     continue
 
-            # Fallback: Use Google snippets ONLY for URLs we couldn't fetch
-            # Do NOT use fallback for URLs that GPT-4 successfully analyzed (trust GPT-4's judgment)
-            if len(all_reviews) < 5 and failed_to_fetch_urls:
-                logger.info(f"🔄 Fallback: Using Google snippets for {len(failed_to_fetch_urls)} URLs we couldn't fetch")
-                logger.info(f"ℹ️  Not using fallback for {len(gpt4_found_no_reviews)} URLs where GPT-4 found no reviews (trusting GPT-4)")
-
-                # Extract key name for filtering (same logic as GPT-4 extraction)
-                name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
-                key_name = name_parts[0] if name_parts else doctor_name.lower()
-
-                fallback_added = 0
-                for url_dict in failed_to_fetch_urls[:10]:  # Use up to 10 snippets as fallback
-                    snippet = url_dict.get("snippet", "")
-                    url = url_dict.get("url", "")
-
-                    # For failed_to_fetch URLs, we can't verify the URL works
-                    # So we ONLY use the Google snippet text, and EXCLUDE the URL from results
-                    # This way users see the snippet but can't click broken links
-
-                    # Skip Facebook official hospital pages (same logic as GPT-4 extraction)
-                    url_lower = url.lower()
-                    if 'facebook.com/' in url_lower:
-                        parts = url_lower.split('facebook.com/')
-                        if len(parts) > 1:
-                            path = parts[1].split('/')[0].split('?')[0]
-                            if any(name in path for name in MALAYSIA_HOSPITAL_NAMES):
-                                if path != 'groups':
-                                    logger.debug(f"⏭️ Fallback: Skipping Facebook hospital page: {url[:70]}...")
-                                    continue
-
-                    # Filter: Only use snippets that mention the doctor's name
-                    if snippet and len(snippet) > 20:  # Only use meaningful snippets
-                        snippet_lower = snippet.lower()
-
-                        # Skip directory listings and non-review content
-                        skip_patterns = [
-                            'address:',           # Address listings
-                            'jalan ss',           # Malaysian address
-                            'selangor, malaysia', # Location info
-                            'google ...',         # Google ellipsis (directory listing)
-                            'internal:',          # Staff listings
-                            'assoc. prof.',       # Academic listings
-                            'fke.postgraduate',   # Academic pages
-                            'aestheticsadvisor',  # Directory site
-                            'professional registration', # Doctor bio pages
-                            'lulusan',            # Indonesian doctor directory (educational background)
-                            'pakar program',      # Doctor specialty programs
-                            'dokter spesialis',   # Indonesian (specialist doctor)
-                            'adalah dokter',      # Indonesian (is a doctor)
-                            'doctor registration', # Registration pages
-                            'years of experience', # Bio pages
-                            'graduated from',     # Educational background
-                            'tak pernah jumpa',   # Malay: never met (not a real review)
-                            'never met',          # English: never met
-                            'consultation hours', # Doctor directory info
-                            'office hours',
-                            'bilik:',             # Malay: room number (directory info)
-                            'phone:',
-                            'extension no',
-                        ]
-
-                        if any(pattern in snippet_lower for pattern in skip_patterns):
-                            logger.debug(f"⏭️ Fallback: Skipping directory/bio content: {snippet[:50]}...")
-                            continue
-
-                        # CRITICAL: Check if snippet contains actual review language
-                        # Only accept snippets that show patient experiences, not just doctor mentions
-                        review_indicators = [
-                            # Malay/Indonesian review keywords
-                            'saya',              # I (first person - indicates patient experience)
-                            'aku',               # I (informal)
-                            'recommended',       # Recommendation
-                            'recommend',
-                            'sangat bagus',      # Very good
-                            'doktor tu',         # That doctor (informal discussion)
-                            'pengalaman',        # Experience (when combined with first person)
-
-                            # English review keywords
-                            'went to',           # Patient action
-                            'visited',
-                            'my experience',
-                            'i went',
-                            'saw dr',
-                            'he/she was',
-                            'very good',
-                            'excellent',
-                            'terrible',
-                            'complaint',
-                            'helped me',
-                        ]
-
-                        # Check if snippet contains at least one review indicator
-                        has_review_language = any(indicator in snippet_lower for indicator in review_indicators)
-
-                        if not has_review_language:
-                            logger.debug(f"⏭️ Fallback: Skipping non-review snippet (no patient experience language): {snippet[:50]}...")
-                            continue
-
-                        if key_name in snippet_lower:
-                            # Try to extract date from snippet text
-                            import re
-                            from datetime import datetime
-
-                            extracted_date = ""
-                            # Pattern 1: "Nov 17, 2020" or "Jun 23, 2020"
-                            date_match = re.search(r'([A-Z][a-z]{2})\s+(\d{1,2}),\s+(\d{4})', snippet)
-                            if date_match:
-                                try:
-                                    month_str = date_match.group(1)
-                                    day = date_match.group(2)
-                                    year = date_match.group(3)
-                                    # Parse date
-                                    parsed_date = datetime.strptime(f"{month_str} {day} {year}", "%b %d %Y")
-                                    extracted_date = parsed_date.strftime("%Y-%m-%d")
-                                except ValueError:
-                                    pass
-
-                            # Pattern 2: "2013-08-21" (YYYY-MM-DD already formatted)
-                            if not extracted_date:
-                                date_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', snippet)
-                                if date_match:
-                                    extracted_date = date_match.group(0)
-
-                            all_reviews.append({
-                                "snippet": snippet,
-                                "url": "",  # Don't include URL since we couldn't verify it works
-                                "review_date": extracted_date,
-                                "author_name": "",
-                                "source": "google_snippet_unverified"
-                            })
-                            fallback_added += 1
-                        else:
-                            logger.debug(f"⏭️ Filtered out fallback snippet without '{key_name}': {snippet[:50]}...")
-
-                logger.info(f"📋 Added {fallback_added} relevant Google snippets as fallback (filtered from {len(failed_to_fetch_urls[:10])})")
-
-            logger.info(f"✅ Total: {len(all_reviews)} reviews (GPT-4 + fallback)")
+            logger.info(f"✅ Total: {len(all_reviews)} reviews extracted by GPT-4")
 
             return {
                 "reviews": all_reviews,
