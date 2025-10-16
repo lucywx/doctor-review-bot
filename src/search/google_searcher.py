@@ -213,6 +213,13 @@ class GoogleSearcher:
 
             logger.info(f"🔍 Final results: {len(filtered_urls)} URLs ({len(priority_urls)} priority + {len(web_urls)} web, {len(all_urls) - len(filtered_urls)} filtered)")
 
+            # Log all URLs for debugging
+            logger.info(f"📋 All {len(filtered_urls)} URLs after filtering:")
+            for i, url_dict in enumerate(filtered_urls, 1):
+                url = url_dict.get("url", "")
+                source = url_dict.get("source", "unknown")
+                logger.info(f"  {i}. [{source}] {url}")
+
             return {
                 "source": "google_custom_search",
                 "urls": filtered_urls,
