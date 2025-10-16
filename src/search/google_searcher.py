@@ -93,14 +93,14 @@ class GoogleSearcher:
         self.base_url = "https://www.googleapis.com/customsearch/v1"
 
         # Target sites for doctor reviews
+        # Focus on community forums, social media, and Google Maps reviews
+        # Exclude directory sites (aestheticsadvisor, whatclinic) as they rarely have genuine reviews
         self.target_sites = [
             "facebook.com",
             "forum.lowyat.net",
             "cari.com.my",
             "maps.google.com",
-            "google.com/maps",
-            "aestheticsadvisor.com",
-            "whatclinic.com"
+            "google.com/maps"
         ]
 
     async def search_doctor_reviews(
@@ -416,7 +416,25 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
 
                     # Filter: Only use snippets that mention the doctor's name
                     if snippet and len(snippet) > 20:  # Only use meaningful snippets
-                        if key_name in snippet.lower():
+                        snippet_lower = snippet.lower()
+
+                        # Skip directory listings and non-review content
+                        skip_patterns = [
+                            'address:',           # Address listings
+                            'jalan ss',           # Malaysian address
+                            'selangor, malaysia', # Location info
+                            'google ...',         # Google ellipsis (directory listing)
+                            'internal:',          # Staff listings
+                            'assoc. prof.',       # Academic listings
+                            'fke.postgraduate',   # Academic pages
+                            'aestheticsadvisor'   # Directory site
+                        ]
+
+                        if any(pattern in snippet_lower for pattern in skip_patterns):
+                            logger.debug(f"⏭️ Fallback: Skipping directory/address content: {snippet[:50]}...")
+                            continue
+
+                        if key_name in snippet_lower:
                             # Try to extract date from snippet text
                             import re
                             from datetime import datetime
