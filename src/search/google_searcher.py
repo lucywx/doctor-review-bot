@@ -209,24 +209,75 @@ class GoogleSearcher:
                     if len(parts) > 1:
                         path = parts[1].split('/')[0].split('?')[0]  # Get first segment, remove query params
 
-                        # Check if path contains specific hospital names (Malaysia major hospitals)
+                        # Check if path contains specific hospital names (Malaysia Top 50 hospitals)
                         hospital_names = [
-                            'gleneagles',           # Gleneagles Hospital
-                            'pantai',               # Pantai Hospital
-                            'sunway',               # Sunway Medical Centre
-                            'subangjaya',           # Subang Jaya Medical Centre
-                            'sjmc',                 # Subang Jaya Medical Centre abbreviation
-                            'sdmc',                 # Sime Darby Medical Centre
-                            'prince court',         # Prince Court Medical Centre
-                            'princecourt',
-                            'mncc',                 # Malaysia National Cancer Council
-                            'ummc',                 # University Malaya Medical Centre
-                            'kpj',                  # KPJ Healthcare
-                            'tmc',                  # TMC (Tropicana Medical Centre)
-                            'columbiasia',          # Columbia Asia Hospital
-                            'adventist',            # Adventist Hospital
-                            'tung shin',            # Tung Shin Hospital
-                            'tungshin'
+                            # Top 10
+                            'sunway',                   # Sunway Medical Centre
+                            'gleneagles',               # Gleneagles Hospital KL
+                            'subangjaya',               # Subang Jaya Medical Centre
+                            'sjmc',                     # SJMC abbreviation
+                            'hkl',                      # Hospital Kuala Lumpur
+                            'princecourt',              # Prince Court Medical Centre
+                            'prince court',
+                            'pantai',                   # Pantai Hospital (multiple branches)
+                            'island hospital',          # Island Hospital Penang
+                            'islandhospital',
+
+                            # Top 11-20
+                            'kpj',                      # KPJ Healthcare (multiple branches)
+                            'lohguan',                  # Loh Guan Lye
+                            'penang adventist',         # Penang Adventist Hospital
+                            'adventisthospital',
+                            'sime darby',               # Sime Darby Medical Centre
+                            'sdmc',
+                            'tropicana',                # Tropicana Medical Centre
+                            'beacon',                   # Beacon Hospital
+                            'ipoh specialist',          # Ipoh Specialist Hospital
+                            'ipohspecialist',
+                            'normah',                   # Normah Medical Specialist Centre
+
+                            # Top 21-30
+                            'columbia asia',            # Columbia Asia (multiple branches)
+                            'columbiasia',
+                            'ummc',                     # University Malaya Medical Centre
+                            'putra',                    # Putra Specialist Hospital
+                            'putrajaya',                # Putrajaya Hospital
+                            'melaka',                   # Melaka Hospital
+                            'kuala lumpur',             # Hospital Kuala Lumpur
+                            'ampang',                   # Ampang Hospital
+                            'selayang',                 # Selayang Hospital
+                            'tung shin',                # Tung Shin Hospital
+                            'tungshin',
+
+                            # Top 31-40
+                            'mahkota',                  # Mahkota Medical Centre
+                            'ara damansara',            # Ara Damansara Medical Centre
+                            'aradamansara',
+                            'tawakal',                  # Hospital Tawakal
+                            'tuanku jaafar',            # Tuanku Ja'afar Hospital
+                            'tuankujaafar',
+                            'sultanah aminah',          # Hospital Sultanah Aminah
+                            'sultanahaminah',
+                            'tengku ampuan rahimah',    # Hospital Tengku Ampuan Rahimah
+                            'htar',
+                            'sultan ismail',            # Hospital Sultan Ismail
+                            'sultanismail',
+
+                            # Top 41-50
+                            'sultanah bahiyah',         # Hospital Sultanah Bahiyah
+                            'sultanahbahiyah',
+                            'raja permaisuri bainun',   # Hospital Raja Permaisuri Bainun
+                            'hrpb',
+                            'bainun',
+                            'tuanku fauziah',           # Hospital Tuanku Fauziah
+                            'tuankufauziah',
+                            'sultanah nur zahirah',     # Hospital Sultanah Nur Zahirah
+                            'sultanahzahirah',
+                            'duke',                     # Duke Medical Centre
+                            'thomson',                  # Thomson Hospital
+                            'assunta',                  # Assunta Hospital
+                            'damansara specialist',     # Damansara Specialist Hospital
+                            'damansaraspecialist'
                         ]
 
                         # If path contains hospital name, it's likely an official page
