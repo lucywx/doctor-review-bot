@@ -384,7 +384,8 @@ class GoogleSearcher:
 
             openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
             all_reviews = []
-            failed_urls = []  # URLs that failed to fetch or had no reviews
+            failed_to_fetch_urls = []  # URLs that failed to fetch (HTTP errors, timeout, etc.)
+            gpt4_found_no_reviews = []  # URLs that GPT-4 analyzed but found no reviews
             verified_working_urls = set()  # URLs we successfully accessed (HTTP 200)
 
             # Track processing time to avoid timeout
@@ -397,8 +398,8 @@ class GoogleSearcher:
                 elapsed = time.time() - start_time
                 if elapsed > max_processing_time:
                     logger.warning(f"⏱️ Timeout approaching ({elapsed:.1f}s), stopping extraction")
-                    # Continue with fallback for remaining URLs
-                    failed_urls.extend(urls[len(all_reviews):])
+                    # Mark remaining URLs as failed to fetch (didn't have time to try)
+                    failed_to_fetch_urls.extend(urls[len(all_reviews):])
                     break
                 url = url_dict.get("url", "")
                 google_snippet = url_dict.get("snippet", "")
@@ -419,7 +420,7 @@ class GoogleSearcher:
                             # Exception: groups are OK (even if hospital-related)
                             if path != 'groups':
                                 logger.info(f"⏭️ Skipping Facebook official hospital page: {url[:70]}...")
-                                failed_urls.append(url_dict)
+                                # Don't use fallback for hospital official pages
                                 continue
 
                 try:
@@ -429,7 +430,7 @@ class GoogleSearcher:
 
                         if response.status_code != 200:
                             logger.warning(f"❌ HTTP {response.status_code} for {url}")
-                            failed_urls.append(url_dict)
+                            failed_to_fetch_urls.append(url_dict)
                             continue
 
                         # Mark this URL as working (successfully accessed)
@@ -512,37 +513,38 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
                             all_reviews.extend(relevant_reviews)
                             logger.info(f"📄 Extracted {len(relevant_reviews)}/{len(reviews)} relevant reviews from {url}")
                         else:
+                            # GPT-4 extracted reviews but none mention doctor name
                             logger.warning(f"⚠️ GPT-4 extracted {len(reviews)} reviews but none mention '{doctor_name}'")
-                            failed_urls.append(url_dict)
+                            gpt4_found_no_reviews.append(url_dict)
                     else:
-                        # GPT-4 found no reviews - mark for fallback
-                        logger.warning(f"⚠️ GPT-4 found no reviews in {url}")
-                        failed_urls.append(url_dict)
+                        # GPT-4 analyzed the page and found no patient reviews
+                        # Trust GPT-4's judgment - don't use fallback for these
+                        logger.info(f"✓ GPT-4 verified no patient reviews in {url}")
+                        gpt4_found_no_reviews.append(url_dict)
 
                 except Exception as e:
                     logger.warning(f"❌ Failed to extract from {url}: {e}")
-                    failed_urls.append(url_dict)
+                    failed_to_fetch_urls.append(url_dict)
                     continue
 
-            # Fallback: Use Google snippets if GPT-4 extraction yielded few results
-            # IMPORTANT: Only use snippets from URLs we successfully verified (HTTP 200)
-            if len(all_reviews) < 5 and failed_urls:
-                logger.info(f"🔄 Fallback: Checking {len(failed_urls)} failed URLs for usable snippets")
+            # Fallback: Use Google snippets ONLY for URLs we couldn't fetch
+            # Do NOT use fallback for URLs that GPT-4 successfully analyzed (trust GPT-4's judgment)
+            if len(all_reviews) < 5 and failed_to_fetch_urls:
+                logger.info(f"🔄 Fallback: Using Google snippets for {len(failed_to_fetch_urls)} URLs we couldn't fetch")
+                logger.info(f"ℹ️  Not using fallback for {len(gpt4_found_no_reviews)} URLs where GPT-4 found no reviews (trusting GPT-4)")
 
                 # Extract key name for filtering (same logic as GPT-4 extraction)
                 name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
                 key_name = name_parts[0] if name_parts else doctor_name.lower()
 
                 fallback_added = 0
-                for url_dict in failed_urls[:10]:  # Use up to 10 snippets as fallback
+                for url_dict in failed_to_fetch_urls[:10]:  # Use up to 10 snippets as fallback
                     snippet = url_dict.get("snippet", "")
                     url = url_dict.get("url", "")
 
-                    # CRITICAL: Only use snippet if we verified the URL works (HTTP 200)
-                    # This prevents sending broken/404 links to users
-                    if url not in verified_working_urls:
-                        logger.debug(f"⏭️ Fallback: Skipping unverified URL: {url[:60]}...")
-                        continue
+                    # For failed_to_fetch URLs, we can't verify the URL works
+                    # So we ONLY use the Google snippet text, and EXCLUDE the URL from results
+                    # This way users see the snippet but can't click broken links
 
                     # Skip Facebook official hospital pages (same logic as GPT-4 extraction)
                     url_lower = url.lower()
@@ -650,16 +652,16 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
 
                             all_reviews.append({
                                 "snippet": snippet,
-                                "url": url,
+                                "url": "",  # Don't include URL since we couldn't verify it works
                                 "review_date": extracted_date,
                                 "author_name": "",
-                                "source": "google_snippet"
+                                "source": "google_snippet_unverified"
                             })
                             fallback_added += 1
                         else:
                             logger.debug(f"⏭️ Filtered out fallback snippet without '{key_name}': {snippet[:50]}...")
 
-                logger.info(f"📋 Added {fallback_added} relevant Google snippets as fallback (filtered from {len(failed_urls[:10])})")
+                logger.info(f"📋 Added {fallback_added} relevant Google snippets as fallback (filtered from {len(failed_to_fetch_urls[:10])})")
 
             logger.info(f"✅ Total: {len(all_reviews)} reviews (GPT-4 + fallback)")
 
