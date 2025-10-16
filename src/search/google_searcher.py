@@ -379,7 +379,8 @@ class GoogleSearcher:
 
             openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
             all_reviews = []
-            failed_urls = []
+            failed_urls = []  # URLs that failed to fetch or had no reviews
+            verified_working_urls = set()  # URLs we successfully accessed (HTTP 200)
 
             # Track processing time to avoid timeout
             start_time = time.time()
@@ -426,6 +427,8 @@ class GoogleSearcher:
                             failed_urls.append(url_dict)
                             continue
 
+                        # Mark this URL as working (successfully accessed)
+                        verified_working_urls.add(url)
                         html_content = response.text[:30000]  # Limit to 30k chars (balance between content and speed)
 
                     # Use GPT-4 to extract ONLY genuine patient reviews
@@ -517,8 +520,9 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
                     continue
 
             # Fallback: Use Google snippets if GPT-4 extraction yielded few results
+            # IMPORTANT: Only use snippets from URLs we successfully verified (HTTP 200)
             if len(all_reviews) < 5 and failed_urls:
-                logger.info(f"🔄 Using fallback: Google snippets for {len(failed_urls)} URLs")
+                logger.info(f"🔄 Fallback: Checking {len(failed_urls)} failed URLs for usable snippets")
 
                 # Extract key name for filtering (same logic as GPT-4 extraction)
                 name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
@@ -528,6 +532,12 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
                 for url_dict in failed_urls[:10]:  # Use up to 10 snippets as fallback
                     snippet = url_dict.get("snippet", "")
                     url = url_dict.get("url", "")
+
+                    # CRITICAL: Only use snippet if we verified the URL works (HTTP 200)
+                    # This prevents sending broken/404 links to users
+                    if url not in verified_working_urls:
+                        logger.debug(f"⏭️ Fallback: Skipping unverified URL: {url[:60]}...")
+                        continue
 
                     # Skip Facebook official hospital pages (same logic as GPT-4 extraction)
                     url_lower = url.lower()
