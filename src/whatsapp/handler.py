@@ -438,6 +438,36 @@ You'll be able to use the bot once approved."""
             await whatsapp_client.send_message(from_number, no_results)
             return
 
+        # Filter reviews to last 5 years only
+        from datetime import datetime, timedelta
+        five_years_ago = datetime.now() - timedelta(days=5*365)
+
+        recent_reviews = []
+        for review in valid_reviews:
+            date_str = review.get("review_date", "")
+            if date_str:
+                try:
+                    review_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    # Keep if within 5 years or undated
+                    if review_date >= five_years_ago:
+                        recent_reviews.append(review)
+                except ValueError:
+                    # Invalid date format - keep the review
+                    recent_reviews.append(review)
+            else:
+                # No date - keep the review
+                recent_reviews.append(review)
+
+        logger.info(f"Filtered to {len(recent_reviews)} reviews within last 5 years (from {len(valid_reviews)} total)")
+
+        # Check if filtering removed all reviews
+        if not recent_reviews:
+            await whatsapp_client.send_message(
+                from_number,
+                f"❌ Found {len(valid_reviews)} reviews for *{doctor_name}*, but all are older than 5 years.\n\nTry searching for a different doctor or contact the hospital for current information."
+            )
+            return
+
         # Sort by date (newest first)
         def parse_date(review):
             """Extract date for sorting"""
@@ -446,7 +476,7 @@ You'll be able to use the bot once approved."""
                 return "1900-01-01"  # Put undated reviews at end
             return date_str
 
-        sorted_reviews = sorted(valid_reviews, key=parse_date, reverse=True)
+        sorted_reviews = sorted(recent_reviews, key=parse_date, reverse=True)
 
         # Limit to 2 parts maximum (10 reviews per part)
         max_reviews = 20  # Show max 20 reviews total
