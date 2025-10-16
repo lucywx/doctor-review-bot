@@ -173,8 +173,9 @@ class GoogleSearcher:
         else:
             query_parts.append("Malaysia")
 
-        # Add review keywords
-        query_parts.append("(review OR reviews OR testimonial OR feedback OR experience)")
+        # Add review keywords - include negative keywords to catch complaints and lawsuits
+        # This ensures we find both positive and negative patient experiences
+        query_parts.append("(review OR reviews OR testimonial OR feedback OR experience OR complaint OR lawsuit OR sued OR malpractice OR negligence)")
 
         return " ".join(query_parts)
 
