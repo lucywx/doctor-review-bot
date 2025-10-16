@@ -392,20 +392,30 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
             if len(all_reviews) < 5 and failed_urls:
                 logger.info(f"🔄 Using fallback: Google snippets for {len(failed_urls)} URLs")
 
+                # Extract key name for filtering (same logic as GPT-4 extraction)
+                name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
+                key_name = name_parts[0] if name_parts else doctor_name.lower()
+
+                fallback_added = 0
                 for url_dict in failed_urls[:10]:  # Use up to 10 snippets as fallback
                     snippet = url_dict.get("snippet", "")
                     url = url_dict.get("url", "")
 
+                    # Filter: Only use snippets that mention the doctor's name
                     if snippet and len(snippet) > 20:  # Only use meaningful snippets
-                        all_reviews.append({
-                            "snippet": snippet,
-                            "url": url,
-                            "review_date": "",
-                            "author_name": "",
-                            "source": "google_snippet"
-                        })
+                        if key_name in snippet.lower():
+                            all_reviews.append({
+                                "snippet": snippet,
+                                "url": url,
+                                "review_date": "",
+                                "author_name": "",
+                                "source": "google_snippet"
+                            })
+                            fallback_added += 1
+                        else:
+                            logger.debug(f"⏭️ Filtered out fallback snippet without '{key_name}': {snippet[:50]}...")
 
-                logger.info(f"📋 Added {len(failed_urls[:10])} Google snippets as fallback")
+                logger.info(f"📋 Added {fallback_added} relevant Google snippets as fallback (filtered from {len(failed_urls[:10])})")
 
             logger.info(f"✅ Total: {len(all_reviews)} reviews (GPT-4 + fallback)")
 
