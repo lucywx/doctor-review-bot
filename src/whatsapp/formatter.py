@@ -22,11 +22,6 @@ This doctor may have limited online presence. This can happen when:
 • Patients haven't posted online reviews yet
 • Information is only available offline
 
-📍 *What you can do:*
-• Try adding hospital/clinic name (e.g., "Tang Boon Nee Gleneagles")
-• Check spelling carefully
-• Contact the hospital directly for doctor information
-
 _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
 
     # Sort reviews by date (newest first)
