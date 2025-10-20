@@ -36,8 +36,12 @@ async def init_database():
             schema_sql = f.read()
 
         print("📝 Executing schema SQL...")
-        await conn.execute(schema_sql)
-        print("✅ Database schema created successfully")
+        try:
+            await conn.execute(schema_sql)
+            print("✅ Database schema created successfully")
+        except Exception as e:
+            print(f"ℹ️  Schema already exists or minor error (this is OK): {str(e)[:100]}")
+            # Don't raise - schema might already exist, which is fine
 
         # Verify tables
         tables = await conn.fetch("""

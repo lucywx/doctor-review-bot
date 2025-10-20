@@ -178,12 +178,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Triggers for updated_at
+-- Triggers for updated_at (drop if exists, then create)
+DROP TRIGGER IF EXISTS update_doctors_updated_at ON doctors;
 CREATE TRIGGER update_doctors_updated_at
     BEFORE UPDATE ON doctors
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_doctor_reviews_updated_at ON doctor_reviews;
 CREATE TRIGGER update_doctor_reviews_updated_at
     BEFORE UPDATE ON doctor_reviews
     FOR EACH ROW
