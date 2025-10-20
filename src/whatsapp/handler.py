@@ -410,6 +410,57 @@ You'll be able to use the bot once approved."""
             "specialty": specialty
         }
 
+    def _merge_reviews_by_url(self, reviews: list) -> list:
+        """
+        Merge multiple reviews from the same URL into a single entry
+
+        Args:
+            reviews: List of review dicts
+
+        Returns:
+            List of merged reviews with unique URLs
+        """
+        from collections import defaultdict
+
+        # Group reviews by URL
+        url_groups = defaultdict(list)
+        for review in reviews:
+            url = review.get("url", "")
+            if url:
+                url_groups[url].append(review)
+
+        merged = []
+        for url, group in url_groups.items():
+            if len(group) == 1:
+                # Only one review for this URL, keep as-is
+                merged.append(group[0])
+            else:
+                # Multiple reviews from same URL - merge them
+                logger.info(f"Merging {len(group)} reviews from same URL: {url[:60]}...")
+
+                # Combine snippets with separator
+                combined_snippet = "\n\n---\n\n".join([
+                    r.get("snippet", "") for r in group if r.get("snippet")
+                ])
+
+                # Get most recent date
+                dates = [r.get("review_date", "") for r in group if r.get("review_date")]
+                most_recent_date = max(dates) if dates else ""
+
+                # Combine all authors
+                authors = [r.get("author_name", "") for r in group if r.get("author_name")]
+                combined_authors = ", ".join(set(authors)) if authors else ""
+
+                # Create merged review using first review as base
+                merged_review = group[0].copy()
+                merged_review["snippet"] = combined_snippet
+                merged_review["review_date"] = most_recent_date
+                merged_review["author_name"] = combined_authors
+
+                merged.append(merged_review)
+
+        return merged
+
     async def _send_reviews_in_batches(self, from_number: str, doctor_name: str, reviews: list):
         """
         Send reviews in multiple messages to show all results
@@ -449,9 +500,13 @@ You'll be able to use the bot once approved."""
         sorted_reviews = sorted(valid_reviews, key=parse_date, reverse=True)
         logger.info(f"Displaying {len(sorted_reviews)} reviews (sorted by date, newest first)")
 
+        # Merge reviews from same URL
+        merged_reviews = self._merge_reviews_by_url(sorted_reviews)
+        logger.info(f"After merging same-URL reviews: {len(merged_reviews)} unique sources")
+
         # Limit to 2 parts maximum (10 reviews per part)
         max_reviews = 20  # Show max 20 reviews total
-        display_reviews = sorted_reviews[:max_reviews]
+        display_reviews = merged_reviews[:max_reviews]
 
         # Calculate batch size to fit in 2 parts
         if len(display_reviews) <= 10:
