@@ -93,14 +93,12 @@ class GoogleSearcher:
         self.base_url = "https://www.googleapis.com/customsearch/v1"
 
         # Priority sites: High-quality review platforms (searched first, results boosted)
+        # COST OPTIMIZATION: Reduced from 6 to 3 sites to save API calls
         # These sites consistently have genuine patient reviews and discussions
         self.priority_sites = [
             "forum.lowyat.net",      # Malaysia's largest tech/general forum - active medical discussions
             "cari.com.my",           # Popular Malaysian community forum
-            "facebook.com",          # Social media - groups and posts
-            "linkedin.com",          # Professional network - formal complaints
-            "google.com/maps",       # Google Maps reviews
-            "maps.google.com",       # Google Maps reviews (alternate domain)
+            "google.com/maps",       # Google Maps reviews (most reliable source)
         ]
 
         # Blacklist: Sites to exclude from search results
@@ -174,8 +172,8 @@ class GoogleSearcher:
 
             logger.info(f"📌 Priority sites search: {len(priority_urls)} URLs from {len(self.priority_sites)} sites")
 
-            # Phase 2: Web-wide search (get remaining results to reach ~30 total)
-            remaining_needed = max(30 - len(priority_urls), 10)  # Get at least 10 from web
+            # Phase 2: Web-wide search (COST OPTIMIZATION: reduced from 30 to 10 results = 1 API call instead of 3)
+            remaining_needed = max(10 - len(priority_urls), 5)  # Get at least 5 from web
             web_urls = await self._search_web(query, num_results=remaining_needed)
 
             logger.info(f"🌐 Web-wide search: {len(web_urls)} URLs")
@@ -571,9 +569,9 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
             start_time = time.time()
             max_processing_time = 25  # seconds (leave 5 seconds buffer for WhatsApp timeout)
 
-            # Process URLs concurrently (up to 10 URLs)
+            # Process URLs concurrently (COST OPTIMIZATION: reduced from 10 to 5 URLs to cut GPT cost by 50%)
             tasks = []
-            for url_dict in urls[:10]:  # Limit to 10 URLs for concurrent processing
+            for url_dict in urls[:5]:  # Limit to 5 URLs for concurrent processing
                 task = self._process_single_url(url_dict, doctor_name, openai_client)
                 tasks.append(task)
 
