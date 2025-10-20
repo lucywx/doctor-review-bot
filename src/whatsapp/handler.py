@@ -171,7 +171,13 @@ You'll be able to use the bot once approved."""
                 await whatsapp_client.send_message(from_number, response)
                 return
 
-            # Check user quota
+            # Admin has unlimited quota - skip quota check
+            if from_number == settings.admin_phone_number:
+                logger.info(f"👑 Admin search - unlimited quota")
+                await self._perform_search(from_number, doctor_name)
+                return
+
+            # Check user quota (for non-admin users)
             from src.models.user import user_quota_manager
             quota_status = await user_quota_manager.check_and_update_quota(from_number)
 
