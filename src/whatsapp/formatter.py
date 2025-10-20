@@ -171,14 +171,14 @@ Simply send the doctor's full name
 
 🔍 We'll search Google Maps, Facebook, forums, and healthcare sites for patient reviews.
 
-⚡ *Daily limit:* 50 searches"""
+⚡ *Daily limit:* 10 searches"""
 
 
 def format_error_message(error_type: str = "general") -> str:
     """Format error messages"""
     messages = {
         "general": "❌ Sorry, an error occurred while processing your request. Please try again later.",
-        "quota_exceeded": "⚠️ You've reached your daily query limit.\nDaily limit: 50 queries\nTry again tomorrow!",
+        "quota_exceeded": "⚠️ You've reached your daily query limit.\nDaily limit: 10 queries\nTry again tomorrow!",
         "invalid_input": "❌ Unable to recognize your input.\nPlease send a doctor's name, e.g.: Dr. Smith",
         "no_results": "❌ No reviews found.\nSuggestions:\n• Check spelling\n• Add hospital or location\n• Use full name",
         "rate_limit": "⏳ Request too fast, please try again later."

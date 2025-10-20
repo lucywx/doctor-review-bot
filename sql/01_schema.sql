@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     role VARCHAR(20) DEFAULT 'user',
 
     -- Quota management
-    daily_quota INTEGER DEFAULT 50,
+    daily_quota INTEGER DEFAULT 10,
     today_usage INTEGER DEFAULT 0,
     total_searches INTEGER DEFAULT 0,
 

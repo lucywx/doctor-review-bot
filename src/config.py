@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     cache_cold_doctor_ttl_days: int = Field(default=3, env="CACHE_COLD_DOCTOR_TTL_DAYS")
 
     # Rate Limiting
-    rate_limit_per_user_daily: int = Field(default=50, env="RATE_LIMIT_PER_USER_DAILY")
+    rate_limit_per_user_daily: int = Field(default=10, env="RATE_LIMIT_PER_USER_DAILY")
     rate_limit_per_minute: int = Field(default=10, env="RATE_LIMIT_PER_MINUTE")
 
     # User Access Control
