@@ -415,6 +415,22 @@ class GoogleSearcher:
 
                 html_content = response.text[:30000]
 
+                # Check for common error page indicators
+                html_lower = html_content.lower()
+                error_indicators = [
+                    "page not found",
+                    "404 error",
+                    "page doesn't exist",
+                    "page you're looking for",
+                    "can't seem to find",
+                    "this page isn't available",
+                    "sorry, this page isn't available"
+                ]
+
+                if any(indicator in html_lower for indicator in error_indicators):
+                    logger.info(f"⏭️ Detected error page (404/not found): {url[:70]}...")
+                    return []
+
             # Use GPT-4 to extract ONLY genuine patient reviews
             extraction_prompt = f"""Analyze this webpage and extract ONLY genuine patient reviews about {doctor_name}.
 
