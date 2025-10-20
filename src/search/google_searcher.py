@@ -418,17 +418,47 @@ class GoogleSearcher:
                 # Check for common error page indicators
                 html_lower = html_content.lower()
                 error_indicators = [
+                    # 404 - Page not found
                     "page not found",
                     "404 error",
                     "page doesn't exist",
                     "page you're looking for",
                     "can't seem to find",
                     "this page isn't available",
-                    "sorry, this page isn't available"
+                    "sorry, this page isn't available",
+                    "the requested url was not found",
+
+                    # 403 - Forbidden
+                    "access denied",
+                    "403 forbidden",
+                    "permission denied",
+                    "you don't have permission",
+
+                    # 500 - Server errors
+                    "internal server error",
+                    "500 error",
+                    "something went wrong",
+
+                    # Login/Auth required
+                    "please log in to continue",
+                    "sign in required",
+                    "login required",
+                    "you must be logged in",
+
+                    # Content deleted/removed
+                    "has been deleted",
+                    "has been removed",
+                    "content no longer available",
+                    "post has been deleted",
+
+                    # Rate limiting
+                    "too many requests",
+                    "rate limit exceeded",
+                    "you've been temporarily blocked"
                 ]
 
                 if any(indicator in html_lower for indicator in error_indicators):
-                    logger.info(f"⏭️ Detected error page (404/not found): {url[:70]}...")
+                    logger.info(f"⏭️ Detected error page: {url[:70]}...")
                     return []
 
             # Use GPT-4 to extract ONLY genuine patient reviews
