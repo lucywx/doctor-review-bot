@@ -375,76 +375,48 @@ class GoogleSearcher:
             logger.error(f"Error in web search: {e}")
             return []
 
-    async def extract_content_with_openai(self, urls: List[Dict], doctor_name: str) -> Dict:
+    async def _process_single_url(self, url_dict: Dict, doctor_name: str, openai_client) -> List[Dict]:
         """
-        Scrape URLs and use GPT-4 to extract genuine patient reviews from HTML content
-
-        Strategy:
-        1. Try to fetch HTML and use GPT-4 to extract patient reviews
-        2. Fallback: If GPT-4 extraction fails or finds nothing, use Google's snippet
+        Process a single URL: fetch HTML and extract reviews with GPT-4
 
         Args:
-            urls: List of URL dicts from Google search (includes url, title, snippet)
+            url_dict: URL dictionary with url, title, snippet
             doctor_name: Doctor's name
+            openai_client: OpenAI async client
 
         Returns:
-            Dict with extracted reviews
+            List of extracted reviews (empty if none found)
         """
+        import json
+
+        url = url_dict.get("url", "")
+        if not url:
+            return []
+
+        # Skip Facebook official hospital pages
+        url_lower = url.lower()
+        if 'facebook.com/' in url_lower:
+            parts = url_lower.split('facebook.com/')
+            if len(parts) > 1:
+                path = parts[1].split('/')[0].split('?')[0]
+                if any(name in path for name in MALAYSIA_HOSPITAL_NAMES):
+                    if path != 'groups':
+                        logger.info(f"⏭️ Skipping Facebook official hospital page: {url[:70]}...")
+                        return []
+
         try:
-            from openai import AsyncOpenAI
-            import json
-            import asyncio
-            import time
+            # Fetch HTML content with shorter timeout
+            async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
+                response = await client.get(url)
 
-            openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
-            all_reviews = []
+                if response.status_code != 200:
+                    logger.warning(f"❌ HTTP {response.status_code} for {url}")
+                    return []
 
-            # Track processing time to avoid timeout
-            start_time = time.time()
-            max_processing_time = 25  # seconds (leave 5 seconds buffer for WhatsApp timeout)
+                html_content = response.text[:30000]
 
-            # Process URLs with GPT-4 extraction
-            for url_dict in urls[:15]:  # Process up to 15 URLs
-                # Check if we're approaching timeout
-                elapsed = time.time() - start_time
-                if elapsed > max_processing_time:
-                    logger.warning(f"⏱️ Timeout approaching ({elapsed:.1f}s), stopping extraction")
-                    break
-                url = url_dict.get("url", "")
-                google_snippet = url_dict.get("snippet", "")
-
-                if not url:
-                    continue
-
-                # Skip Facebook official hospital pages
-                url_lower = url.lower()
-                if 'facebook.com/' in url_lower:
-                    # Extract the path after facebook.com/
-                    parts = url_lower.split('facebook.com/')
-                    if len(parts) > 1:
-                        path = parts[1].split('/')[0].split('?')[0]  # Get first segment, remove query params
-
-                        # If path contains hospital name, it's likely an official page
-                        if any(name in path for name in MALAYSIA_HOSPITAL_NAMES):
-                            # Exception: groups are OK (even if hospital-related)
-                            if path != 'groups':
-                                logger.info(f"⏭️ Skipping Facebook official hospital page: {url[:70]}...")
-                                # Don't use fallback for hospital official pages
-                                continue
-
-                try:
-                    # Fetch HTML content with shorter timeout
-                    async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
-                        response = await client.get(url)
-
-                        if response.status_code != 200:
-                            logger.warning(f"❌ HTTP {response.status_code} for {url}")
-                            continue
-
-                        html_content = response.text[:30000]  # Limit to 30k chars (balance between content and speed)
-
-                    # Use GPT-4 to extract ONLY genuine patient reviews
-                    extraction_prompt = f"""Analyze this webpage and extract ONLY genuine patient reviews about {doctor_name}.
+            # Use GPT-4 to extract ONLY genuine patient reviews
+            extraction_prompt = f"""Analyze this webpage and extract ONLY genuine patient reviews about {doctor_name}.
 
 Rules:
 - ONLY include actual patient experiences and reviews ABOUT {doctor_name}
@@ -481,54 +453,114 @@ Return a JSON object with this EXACT structure:
 
 If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews": []}}"""
 
-                    # Call GPT-4 for analysis
-                    completion = await openai_client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": "You are an expert at extracting genuine patient reviews from webpages. You distinguish between patient reviews and doctor information."},
-                            {"role": "user", "content": extraction_prompt}
-                        ],
-                        temperature=0.1,
-                        response_format={"type": "json_object"}
-                    )
+            # Call GPT-4 for analysis
+            completion = await openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an expert at extracting genuine patient reviews from webpages. You distinguish between patient reviews and doctor information."},
+                    {"role": "user", "content": extraction_prompt}
+                ],
+                temperature=0.1,
+                response_format={"type": "json_object"}
+            )
 
-                    # Parse response
-                    content = completion.choices[0].message.content
-                    result = json.loads(content)
-                    reviews = result.get("reviews", [])
+            # Parse response
+            content = completion.choices[0].message.content
+            result = json.loads(content)
+            reviews = result.get("reviews", [])
 
-                    if reviews:
-                        # Filter reviews to ensure they mention the doctor's name
-                        # Extract key name parts (handle "Dr Tang Boon Nee" → check for "tang")
-                        name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
-                        # Use last name (usually first word after removing "Dr")
-                        key_name = name_parts[0] if name_parts else doctor_name.lower()
+            if reviews:
+                # Filter reviews to ensure they mention the doctor's name
+                name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
+                key_name = name_parts[0] if name_parts else doctor_name.lower()
 
-                        relevant_reviews = []
-                        for review in reviews:
-                            snippet = review.get("snippet", "").lower()
-                            # Check if snippet mentions the key name
-                            if key_name in snippet:
-                                review["source"] = "google_custom_search + gpt4_extraction"
-                                review["url"] = url  # Ensure URL is present
-                                relevant_reviews.append(review)
-                            else:
-                                logger.debug(f"⏭️ Filtered out review without '{key_name}': {snippet[:50]}...")
-
-                        if relevant_reviews:
-                            all_reviews.extend(relevant_reviews)
-                            logger.info(f"📄 Extracted {len(relevant_reviews)}/{len(reviews)} relevant reviews from {url}")
-                        else:
-                            # GPT-4 extracted reviews but none mention doctor name
-                            logger.debug(f"⏭️ GPT-4 extracted {len(reviews)} reviews but none mention '{doctor_name}'")
+                relevant_reviews = []
+                for review in reviews:
+                    snippet = review.get("snippet", "").lower()
+                    if key_name in snippet:
+                        review["source"] = "google_custom_search + gpt4_extraction"
+                        review["url"] = url
+                        relevant_reviews.append(review)
                     else:
-                        # GPT-4 analyzed the page and found no patient reviews
-                        logger.debug(f"⏭️ GPT-4 verified no patient reviews in {url}")
+                        logger.debug(f"⏭️ Filtered out review without '{key_name}': {snippet[:50]}...")
 
-                except Exception as e:
-                    logger.warning(f"❌ Failed to extract from {url}: {e}")
-                    continue
+                if relevant_reviews:
+                    logger.info(f"📄 Extracted {len(relevant_reviews)}/{len(reviews)} relevant reviews from {url}")
+                    return relevant_reviews
+                else:
+                    logger.debug(f"⏭️ GPT-4 extracted {len(reviews)} reviews but none mention '{doctor_name}'")
+                    return []
+            else:
+                logger.debug(f"⏭️ GPT-4 verified no patient reviews in {url}")
+                return []
 
+        except Exception as e:
+            logger.warning(f"❌ Failed to extract from {url}: {e}")
+            return []
+
+    async def extract_content_with_openai(self, urls: List[Dict], doctor_name: str) -> Dict:
+        """
+        Scrape URLs and use GPT-4 to extract genuine patient reviews from HTML content
+
+        NEW STRATEGY: Concurrent processing with asyncio.gather
+        - Process multiple URLs in parallel
+        - Respect 25-second timeout
+        - Process up to 10 URLs concurrently
+
+        Args:
+            urls: List of URL dicts from Google search (includes url, title, snippet)
+            doctor_name: Doctor's name
+
+        Returns:
+            Dict with extracted reviews
+        """
+        try:
+            from openai import AsyncOpenAI
+            import asyncio
+            import time
+
+            openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+            # Track processing time to avoid timeout
+            start_time = time.time()
+            max_processing_time = 25  # seconds (leave 5 seconds buffer for WhatsApp timeout)
+
+            # Process URLs concurrently (up to 10 URLs)
+            tasks = []
+            for url_dict in urls[:10]:  # Limit to 10 URLs for concurrent processing
+                task = self._process_single_url(url_dict, doctor_name, openai_client)
+                tasks.append(task)
+
+            # Execute all tasks concurrently with timeout
+            logger.info(f"🚀 Processing {len(tasks)} URLs concurrently...")
+
+            try:
+                results = await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=max_processing_time
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"⏱️ Timeout ({max_processing_time}s) reached during concurrent processing")
+                results = []  # Will return empty results if timeout
+
+            # Aggregate all reviews from concurrent tasks
+            all_reviews = []
+            successful_urls = 0
+            failed_urls = 0
+
+            for result in results:
+                if isinstance(result, list):  # Successful result
+                    all_reviews.extend(result)
+                    if result:  # Non-empty result
+                        successful_urls += 1
+                elif isinstance(result, Exception):  # Task failed
+                    logger.warning(f"Task failed with exception: {result}")
+                    failed_urls += 1
+
+            # Calculate elapsed time
+            elapsed_time = time.time() - start_time
+            logger.info(f"⏱️ Processing completed in {elapsed_time:.1f}s")
+            logger.info(f"📊 Results: {successful_urls} URLs with reviews, {failed_urls} failed")
             logger.info(f"✅ Total: {len(all_reviews)} reviews extracted by GPT-4")
 
             return {
