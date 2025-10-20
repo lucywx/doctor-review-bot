@@ -198,6 +198,13 @@ class GoogleSearcher:
                     seen_urls.add(url)
                     all_urls.append(url_dict)
 
+            # Log all URLs BEFORE blacklist filtering
+            logger.info(f"📋 All {len(all_urls)} URLs from Google (BEFORE blacklist filtering):")
+            for i, url_dict in enumerate(all_urls, 1):
+                url = url_dict.get("url", "")
+                source = url_dict.get("source", "unknown")
+                logger.info(f"  {i}. [{source}] {url}")
+
             # Filter out blacklisted sites
             filtered_urls = []
             for url_dict in all_urls:
