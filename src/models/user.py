@@ -78,21 +78,27 @@ class UserQuotaManager:
         if user:
             return user
 
-        # Create new user with standard settings
+        # Determine quota based on user type
+        from src.config import settings
+        is_admin = (user_id == settings.admin_phone_number)
+        quota = settings.rate_limit_admin_monthly if is_admin else self.monthly_quota
+        role = 'admin' if is_admin else 'user'
+
+        # Create new user with appropriate settings
         phone_hash = self._hash_phone(user_id)
         query = """
             INSERT INTO user_sessions (
                 user_id, phone_number_hash, is_active, role,
                 daily_quota, today_usage, total_searches,
                 first_seen_at, last_active_at, quota_reset_at
-            ) VALUES ($1, $2, true, 'user', $3, 0, 0, NOW(), NOW(), CURRENT_DATE)
+            ) VALUES ($1, $2, true, $3, $4, 0, 0, NOW(), NOW(), CURRENT_DATE)
         """
 
-        await db.execute(query, user_id, phone_hash, self.monthly_quota)
+        await db.execute(query, user_id, phone_hash, role, quota)
 
         # Fetch newly created user
         user = await db.fetchrow("SELECT * FROM user_sessions WHERE user_id = $1", user_id)
-        logger.info(f"✅ Created new user: {user_id} (monthly quota: {self.monthly_quota})")
+        logger.info(f"✅ Created new user: {user_id} (role: {role}, monthly quota: {quota})")
         return user
 
     async def _reset_monthly_quota(self, user_id: str):

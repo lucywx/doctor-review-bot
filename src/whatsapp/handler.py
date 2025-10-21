@@ -246,13 +246,7 @@ You'll be able to use the bot once approved."""
                 await whatsapp_client.send_message(from_number, response)
                 return
 
-            # Admin has unlimited quota - skip quota check
-            if from_number == settings.admin_phone_number:
-                logger.info(f"👑 Admin search - unlimited quota")
-                await self._perform_search(from_number, doctor_name)
-                return
-
-            # Check user quota (for non-admin users)
+            # Check user quota (admin also has quota now - 500/month)
             from src.models.user import user_quota_manager
             quota_status = await user_quota_manager.check_and_update_quota(from_number)
 
@@ -405,16 +399,14 @@ You'll be able to use the bot once approved."""
             # Each message can hold ~5 reviews within 1600 char limit
             await self._send_reviews_in_batches(from_number, doctor_name, reviews)
 
-            # Show remaining quota after search (only for non-admin users)
-            from src.config import settings
-            if from_number != settings.admin_phone_number:
-                from src.models.user import user_quota_manager
-                user_stats = await user_quota_manager.get_user_stats(from_number)
-                remaining = user_stats.get("remaining", 0)
-                quota = user_stats.get("monthly_quota", 50)
+            # Show remaining quota after search (for all users including admin)
+            from src.models.user import user_quota_manager
+            user_stats = await user_quota_manager.get_user_stats(from_number)
+            remaining = user_stats.get("remaining", 0)
+            quota = user_stats.get("monthly_quota", 50)
 
-                quota_message = f"\n📊 *Searches remaining this month:* {remaining}/{quota}"
-                await whatsapp_client.send_message(from_number, quota_message)
+            quota_message = f"\n📊 *Searches remaining this month:* {remaining}/{quota}"
+            await whatsapp_client.send_message(from_number, quota_message)
 
         except Exception as e:
             logger.error(f"❌ Error performing search: {e}", exc_info=True)
