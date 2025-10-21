@@ -118,7 +118,7 @@ def format_welcome_message(remaining: int = None, quota: int = 50) -> str:
         remaining: Remaining searches this month (optional)
         quota: Monthly quota limit
     """
-    message = """Meet Your New Doctor Review Assistant!
+    message = """🧑‍⚕️ Meet Your New Doctor Review Assistant!
 
 *STEP 1:* Search any doctor by name. For example, "Dr. Sarah Johnson" 
 *STEP 2:* You get 50 searches monthly
