@@ -69,12 +69,14 @@ Reply to user: Send them a message directly"""
 
     async def _handle_admin_command(self, message_text: str) -> str:
         """
-        Handle admin commands (approve/reject users)
+        Handle admin commands (approve/reject users, view stats)
 
         Returns:
             Response message or None if not an admin command
         """
         from src.models.user_approval import user_approval_manager
+        from src.models.user import user_quota_manager
+        from src.models.search_log import search_logger
 
         message_lower = message_text.lower().strip()
 
@@ -107,6 +109,72 @@ Reply to user: Send them a message directly"""
                 response += f"📱 {user['phone_number']}\n"
                 response += f"   Requested: {user['requested_at']}\n\n"
             response += "Reply: `approve <phone>` or `reject <phone>`"
+            return response
+
+        # View user stats
+        elif message_lower.startswith("stats "):
+            phone = message_text.split()[1].strip()
+            user_stats = await user_quota_manager.get_user_stats(phone)
+            if not user_stats:
+                return f"❌ User not found: {phone}"
+
+            response = f"📊 *User Stats: {phone}*\n\n"
+            response += f"🔍 Total searches: {user_stats.get('total_searches', 0)}\n"
+            response += f"📅 Today's usage: {user_stats.get('today_usage', 0)}/{user_stats.get('daily_quota', 0)}\n"
+            response += f"⏰ Remaining: {user_stats.get('remaining', 0)}\n"
+            response += f"👤 Role: {user_stats.get('role', 'user')}\n"
+            response += f"🆕 First seen: {user_stats.get('first_seen', 'N/A')}\n"
+            response += f"🔄 Last active: {user_stats.get('last_active', 'N/A')}"
+            return response
+
+        # View user search history
+        elif message_lower.startswith("history "):
+            phone = message_text.split()[1].strip()
+            history = await search_logger.get_user_search_history(phone, limit=10)
+            if not history:
+                return f"❌ No search history found for: {phone}"
+
+            response = f"📜 *Search History: {phone}*\n\n"
+            for i, record in enumerate(history, 1):
+                response += f"{i}. {record['doctor_name']}\n"
+                response += f"   📅 {record['created_at']}\n"
+                response += f"   📊 {record['results_count']} results\n"
+                response += f"   ⚡ {record['response_time_ms']}ms\n"
+                response += f"   💾 Cache: {'✅' if record['cache_hit'] else '❌'}\n\n"
+            return response
+
+        # View system daily stats
+        elif message_lower in ["daily", "system", "overview"]:
+            daily_stats = await search_logger.get_daily_stats()
+            popular_doctors = await search_logger.get_popular_doctors(limit=5)
+            
+            response = "📈 *Daily System Overview*\n\n"
+            response += f"🔍 Total searches: {daily_stats.get('total_searches', 0)}\n"
+            response += f"💾 Cache hits: {daily_stats.get('cache_hits', 0)} ({daily_stats.get('cache_hit_rate', 0):.1f}%)\n"
+            response += f"⚡ Avg response: {daily_stats.get('avg_response_time_ms', 0):.0f}ms\n"
+            response += f"💰 Total cost: ${daily_stats.get('total_cost_usd', 0):.3f}\n"
+            response += f"🔗 API calls: {daily_stats.get('total_api_calls', 0)}\n\n"
+            
+            if popular_doctors:
+                response += "🔥 *Popular Doctors (7 days):*\n"
+                for i, doctor in enumerate(popular_doctors, 1):
+                    response += f"{i}. {doctor['doctor_name']} ({doctor['search_count']} searches)\n"
+            
+            return response
+
+        # Help command
+        elif message_lower in ["help", "commands", "admin"]:
+            response = "👑 *Admin Commands:*\n\n"
+            response += "👥 *User Management:*\n"
+            response += "• `approve <phone>` - Approve user\n"
+            response += "• `reject <phone>` - Reject user\n"
+            response += "• `pending` - List pending users\n\n"
+            response += "📊 *User Data:*\n"
+            response += "• `stats <phone>` - User statistics\n"
+            response += "• `history <phone>` - User search history\n\n"
+            response += "📈 *System:*\n"
+            response += "• `daily` - Daily system overview\n"
+            response += "• `help` - Show this help"
             return response
 
         return None  # Not an admin command
@@ -157,8 +225,15 @@ You'll be able to use the bot once approved."""
                 return
 
             # Handle commands
-            if message_text.lower() in ["hi", "hello", "start", "help", "/start"]:
-                response = format_welcome_message()
+            if message_text.lower() in ["hi", "hello", "start", "help", "/start", "quota", "limit"]:
+                # Get user quota status to show in welcome message
+                from src.models.user import user_quota_manager
+                user_stats = await user_quota_manager.get_user_stats(from_number)
+
+                remaining = user_stats.get("remaining", None)
+                quota = user_stats.get("monthly_quota", 50)
+
+                response = format_welcome_message(remaining=remaining, quota=quota)
                 await whatsapp_client.send_message(from_number, response)
                 return
 
@@ -329,6 +404,17 @@ You'll be able to use the bot once approved."""
             # Send results in batches to show all reviews
             # Each message can hold ~5 reviews within 1600 char limit
             await self._send_reviews_in_batches(from_number, doctor_name, reviews)
+
+            # Show remaining quota after search (only for non-admin users)
+            from src.config import settings
+            if from_number != settings.admin_phone_number:
+                from src.models.user import user_quota_manager
+                user_stats = await user_quota_manager.get_user_stats(from_number)
+                remaining = user_stats.get("remaining", 0)
+                quota = user_stats.get("monthly_quota", 50)
+
+                quota_message = f"\n📊 *Searches remaining this month:* {remaining}/{quota}"
+                await whatsapp_client.send_message(from_number, quota_message)
 
         except Exception as e:
             logger.error(f"❌ Error performing search: {e}", exc_info=True)

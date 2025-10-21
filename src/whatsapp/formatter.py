@@ -152,9 +152,15 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
     return message.rstrip()
 
 
-def format_welcome_message() -> str:
-    """Welcome message for new users"""
-    return """👋 Welcome to Doctor Review Bot!
+def format_welcome_message(remaining: int = None, quota: int = 50) -> str:
+    """
+    Welcome message for new users
+
+    Args:
+        remaining: Remaining searches this month (optional)
+        quota: Monthly quota limit
+    """
+    message = """👋 Welcome to Doctor Review Bot!
 
 📝 *How to use:*
 Simply send the doctor's full name
@@ -164,9 +170,14 @@ Simply send the doctor's full name
 • Dr. Smith
 • Dr. Johnson
 
-🔍 We'll search Google Maps, Facebook, forums, and healthcare sites for patient reviews.
+🔍 We'll search Google Maps, Facebook, forums, and healthcare sites for patient reviews."""
 
-⚡ *Daily limit:* 10 searches"""
+    if remaining is not None:
+        message += f"\n\n📊 *Searches this month:* {remaining}/{quota} remaining"
+    else:
+        message += f"\n\n⚡ *Monthly limit:* {quota} searches"
+
+    return message
 
 
 def format_error_message(error_type: str = "general") -> str:
