@@ -193,9 +193,15 @@ Reply to user: Send them a message directly"""
             # Clean input
             message_text = message_text.strip()
 
-            # Check for admin commands first
+            # Check for admin commands first (but not for welcome commands)
             from src.config import settings
             if from_number == settings.admin_phone_number:
+                # Allow welcome commands for admin too
+                if message_text.lower() in ["hi", "hello", "start", "/start"]:
+                    response = format_welcome_message()
+                    await whatsapp_client.send_message(from_number, response)
+                    return
+                
                 admin_response = await self._handle_admin_command(message_text)
                 if admin_response:
                     await whatsapp_client.send_message(from_number, admin_response)
@@ -226,14 +232,8 @@ You'll be able to use the bot once approved."""
 
             # Handle commands
             if message_text.lower() in ["hi", "hello", "start", "help", "/start", "quota", "limit"]:
-                # Get user quota status to show in welcome message
-                from src.models.user import user_quota_manager
-                user_stats = await user_quota_manager.get_user_stats(from_number)
-
-                remaining = user_stats.get("remaining", None)
-                quota = user_stats.get("monthly_quota", 50)
-
-                response = format_welcome_message(remaining=remaining, quota=quota)
+                # Send welcome message
+                response = format_welcome_message()
                 await whatsapp_client.send_message(from_number, response)
                 return
 

@@ -118,22 +118,16 @@ def format_welcome_message(remaining: int = None, quota: int = 50) -> str:
         remaining: Remaining searches this month (optional)
         quota: Monthly quota limit
     """
-    message = """👋 Welcome to Doctor Review Bot!
+    message = """Meet Your New Doctor Review Assistant!
 
-📝 *How to use:*
-Simply send the doctor's full name
+STEP 1: Search any doctor by name. For example, "Dr. Sarah Johnson" 
+STEP 2: You get 50 searches monthly
+STEP 3: Not every doctor has reviews
 
-*Examples:*
-• Dr. Tang Boon Nee
-• Dr. Smith
-• Dr. Johnson
+📢Important!!
+We gather reviews from Google, Facebook, forums (not our views!). We're not connected to any hospitals. Always talk to real doctors for medical advice!
 
-🔍 We'll search Google Maps, Facebook, forums, and healthcare sites for patient reviews."""
-
-    if remaining is not None:
-        message += f"\n\n📊 Monthly quota: {remaining}/{quota} searches remaining"
-    else:
-        message += f"\n\n⚡ Monthly limit: {quota} searches"
+Ready to find your perfect doctor? Let's go!"""
 
     return message
 
