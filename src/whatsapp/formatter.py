@@ -19,7 +19,7 @@ def format_no_results(doctor_name: str, remaining: int = None, quota: int = None
 
     # Show quota at the top
     if remaining is not None and quota is not None:
-        message += f"📊 *Searches this month:* {remaining}/{quota} remaining\n\n"
+        message += f"📊 本月还可搜索 {remaining} 次（共 {quota} 次）\n\n"
 
     message += f"""❌ No reviews found for *{doctor_name}*
 
@@ -58,7 +58,7 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
         message = ""
         # Show quota at the top
         if remaining is not None and quota is not None:
-            message += f"📊 *Searches this month:* {remaining}/{quota} remaining\n\n"
+            message += f"📊 本月还可搜索 {remaining} 次（共 {quota} 次）\n\n"
 
         message += f"🔍 *{doctor_name}*\n"
         message += f"Found {total_count} reviews"
@@ -131,9 +131,9 @@ Simply send the doctor's full name
 🔍 We'll search Google Maps, Facebook, forums, and healthcare sites for patient reviews."""
 
     if remaining is not None:
-        message += f"\n\n📊 *Searches this month:* {remaining}/{quota} remaining"
+        message += f"\n\n📊 本月还可搜索 {remaining} 次（共 {quota} 次）"
     else:
-        message += f"\n\n⚡ *Monthly limit:* {quota} searches"
+        message += f"\n\n⚡ 每月可搜索 {quota} 次"
 
     return message
 
