@@ -120,11 +120,11 @@ def format_welcome_message(remaining: int = None, quota: int = 50) -> str:
     """
     message = """Meet Your New Doctor Review Assistant!
 
-STEP 1: Search any doctor by name. For example, "Dr. Sarah Johnson" 
-STEP 2: You get 50 searches monthly
-STEP 3: Not every doctor has reviews
+*STEP 1:* Search any doctor by name. For example, "Dr. Sarah Johnson" 
+*STEP 2:* You get 50 searches monthly
+*STEP 3:* Not every doctor has reviews
 
-📢Important!!
+📢*Important!!*
 We gather reviews from Google, Facebook, forums (not our views!). We're not connected to any hospitals. Always talk to real doctors for medical advice!
 
 Ready to find your perfect doctor? Let's go!"""
