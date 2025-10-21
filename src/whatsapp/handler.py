@@ -555,8 +555,8 @@ You'll be able to use the bot once approved."""
         quota = user_stats.get("monthly_quota", 50)
 
         if not reviews:
-            from src.whatsapp.formatter import format_review_response
-            no_results = format_review_response(doctor_name, [])
+            from src.whatsapp.formatter import format_no_results
+            no_results = format_no_results(doctor_name, remaining=remaining, quota=quota)
             await whatsapp_client.send_message(from_number, no_results)
             return
 
@@ -566,8 +566,8 @@ You'll be able to use the bot once approved."""
         valid_reviews = reviews
 
         if not valid_reviews:
-            from src.whatsapp.formatter import format_review_response
-            no_results = format_review_response(doctor_name, [])
+            from src.whatsapp.formatter import format_no_results
+            no_results = format_no_results(doctor_name, remaining=remaining, quota=quota)
             await whatsapp_client.send_message(from_number, no_results)
             return
 

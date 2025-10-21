@@ -3,19 +3,25 @@ Message formatting utilities for WhatsApp
 """
 
 
-def format_review_response(doctor_name: str, reviews: list) -> str:
+def format_no_results(doctor_name: str, remaining: int = None, quota: int = None) -> str:
     """
-    Format doctor review results for WhatsApp
+    Format 'no results' message with quota display
 
     Args:
         doctor_name: Doctor's name
-        reviews: List of review dicts with keys: snippet, source, url, author_name, review_date
+        remaining: Remaining searches this month (optional)
+        quota: Monthly quota limit (optional)
 
     Returns:
         Formatted message string
     """
-    if not reviews:
-        return f"""❌ No reviews found for *{doctor_name}*
+    message = ""
+
+    # Show quota at the top
+    if remaining is not None and quota is not None:
+        message += f"📊 *Searches this month:* {remaining}/{quota} remaining\n\n"
+
+    message += f"""❌ No reviews found for *{doctor_name}*
 
 This doctor may have limited online presence. This can happen when:
 • Doctor is relatively new or practices in smaller clinics
@@ -23,61 +29,6 @@ This doctor may have limited online presence. This can happen when:
 • Information is only available offline
 
 _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
-
-    # Sort reviews by date (newest first)
-    def parse_date(review):
-        """Extract date for sorting"""
-        date_str = review.get("review_date", "")
-        if not date_str:
-            return "1900-01-01"  # Put undated reviews at end
-        return date_str
-
-    sorted_reviews = sorted(reviews, key=parse_date, reverse=True)
-
-    # Build header
-    message = f"🔍 *{doctor_name}*\nFound {len(reviews)} reviews\n\n"
-
-    # WhatsApp limit: 1600 characters
-    # Strategy: Show fewer reviews with shorter snippets to stay under limit
-    MAX_MESSAGE_LENGTH = 1500  # Leave buffer
-    display_reviews = sorted_reviews[:5]  # Reduce from 8 to 5
-
-    for i, review in enumerate(display_reviews, 1):
-        snippet = review.get("snippet", "")
-        date = review.get("review_date", "")
-        url = review.get("url", "")
-
-        # Truncate snippet to 80 chars (about 1 line)
-        max_length = 80
-        if len(snippet) > max_length:
-            truncated_snippet = snippet[:max_length].rstrip()
-            # Ensure we don't cut in the middle of a word
-            last_space = truncated_snippet.rfind(' ')
-            if last_space > max_length - 20:
-                truncated_snippet = truncated_snippet[:last_space]
-            snippet_display = f"{truncated_snippet}..."
-        else:
-            snippet_display = snippet
-
-        # Format review entry
-        review_entry = f'{i}. "{snippet_display}"\n'
-
-        # Add URL - send full URL so WhatsApp can parse correctly
-        if url and len(url) > 10:
-            # WhatsApp will auto-convert full URLs to clickable links
-            review_entry += f"   🔗 {url}\n"
-
-        review_entry += "\n"
-
-        # Check if adding this review would exceed limit
-        if len(message) + len(review_entry) > MAX_MESSAGE_LENGTH:
-            break
-
-        message += review_entry
-
-    # Show count summary (no "more reviews" text - avoid false expectations)
-    message += f"\n_Showing {i}/{len(reviews)} reviews_\n"
-    message += "_Sources: Google, Facebook, forums_"
 
     return message
 
