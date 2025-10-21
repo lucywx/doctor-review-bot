@@ -83,7 +83,8 @@ _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
 
 
 def format_review_batch(batch: list, start_num: int, batch_num: int = None, total_batches: int = None,
-                        doctor_name: str = "", total_count: int = 0, filtered_count: int = 0) -> str:
+                        doctor_name: str = "", total_count: int = 0, filtered_count: int = 0,
+                        remaining: int = None, quota: int = None) -> str:
     """
     Format a batch of reviews for WhatsApp with header and footer
 
@@ -95,13 +96,20 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
         doctor_name: Doctor's name for header
         total_count: Total number of valid reviews
         filtered_count: Number of filtered/invalid reviews
+        remaining: Remaining searches this month (optional)
+        quota: Monthly quota limit (optional)
 
     Returns:
         Formatted message string
     """
-    # Header with doctor name and count (only on first part or if single message)
+    # Header with quota progress (only on first part or if single message)
     if batch_num == 1 or batch_num is None:
-        message = f"🔍 *{doctor_name}*\n"
+        message = ""
+        # Show quota at the top
+        if remaining is not None and quota is not None:
+            message += f"📊 *Searches this month:* {remaining}/{quota} remaining\n\n"
+
+        message += f"🔍 *{doctor_name}*\n"
         message += f"Found {total_count} reviews"
         if filtered_count > 0:
             message += f" ({filtered_count} removed)"

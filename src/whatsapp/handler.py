@@ -397,16 +397,8 @@ You'll be able to use the bot once approved."""
 
             # Send results in batches to show all reviews
             # Each message can hold ~5 reviews within 1600 char limit
+            # Quota is now shown at the top of the first message
             await self._send_reviews_in_batches(from_number, doctor_name, reviews)
-
-            # Show remaining quota after search (for all users including admin)
-            from src.models.user import user_quota_manager
-            user_stats = await user_quota_manager.get_user_stats(from_number)
-            remaining = user_stats.get("remaining", 0)
-            quota = user_stats.get("monthly_quota", 50)
-
-            quota_message = f"\n📊 *Searches remaining this month:* {remaining}/{quota}"
-            await whatsapp_client.send_message(from_number, quota_message)
 
         except Exception as e:
             logger.error(f"❌ Error performing search: {e}", exc_info=True)
@@ -556,6 +548,12 @@ You'll be able to use the bot once approved."""
         """
         from src.whatsapp.formatter import format_review_batch
 
+        # Get user quota stats to show at the top
+        from src.models.user import user_quota_manager
+        user_stats = await user_quota_manager.get_user_stats(from_number)
+        remaining = user_stats.get("remaining", 0)
+        quota = user_stats.get("monthly_quota", 50)
+
         if not reviews:
             from src.whatsapp.formatter import format_review_response
             no_results = format_review_response(doctor_name, [])
@@ -616,7 +614,9 @@ You'll be able to use the bot once approved."""
                 total_batches=total_batches if total_batches > 1 else None,
                 doctor_name=doctor_name,
                 total_count=len(valid_reviews),
-                filtered_count=0  # Set to 0 to hide "X removed" message
+                filtered_count=0,  # Set to 0 to hide "X removed" message
+                remaining=remaining,  # Add quota info
+                quota=quota  # Add quota info
             )
 
             # Send batch
