@@ -67,7 +67,7 @@ class Settings(BaseSettings):
 
     # User Access Control
     admin_phone_number: str = Field(..., env="ADMIN_PHONE_NUMBER")  # Your WhatsApp number
-    require_approval: bool = Field(default=True, env="REQUIRE_APPROVAL")  # Enable/disable approval system
+    require_approval: bool = Field(default=False, env="REQUIRE_APPROVAL")  # Enable/disable approval system
 
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
