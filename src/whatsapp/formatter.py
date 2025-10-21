@@ -105,8 +105,7 @@ def format_review_batch(batch: list, start_num: int, batch_num: int = None, tota
 
     # Footer (on last part or if single message)
     if batch_num == total_batches or batch_num is None:
-        message += "_Sources: Google, Facebook, forums_\n\n"
-        message += "⚠️ _Note: Results may not include private Facebook posts or content requiring login. Always verify with official sources._"
+        message += "_Sources: Google, Facebook, forums_"
 
     return message.rstrip()
 
