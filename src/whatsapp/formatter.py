@@ -23,11 +23,6 @@ def format_no_results(doctor_name: str, remaining: int = None, quota: int = None
 
     message += f"""❌ No reviews found for *{doctor_name}*
 
-This doctor may have limited online presence. This can happen when:
-• Doctor is relatively new or practices in smaller clinics
-• Patients haven't posted online reviews yet
-• Information is only available offline
-
 _We search: Google Maps, Facebook, forums, and Malaysian healthcare sites_"""
 
     return message
