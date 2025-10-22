@@ -121,7 +121,10 @@ def format_welcome_message(remaining: int = None, quota: int = 50) -> str:
     message = """🧑‍⚕️ Meet Your New Doctor Review Assistant!
 
 *How to use:*
-Search any doctor by name. For example, "Dr. Sarah Johnson". We will try to find patients' reviews about this doctor. You get 50 searches monthly. Please be aware that not every doctor has reviews.
+1. Search any doctor by name. For example, "Dr. Sarah Johnson". We will try to find patients' reviews about this doctor. 
+2. You get maximum 50 searches monthly. 
+3. At the moment, our search results only include doctors in Malaysia.
+4. Please be aware that not every doctor has reviews.
 
 📢*Important!!*
 We gather reviews from Google, Facebook, forums (not our views!). We're not connected to any hospitals. Always talk to real doctors for medical advice!
