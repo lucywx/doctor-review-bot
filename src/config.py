@@ -23,18 +23,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = Field(..., env="DATABASE_URL")
 
-    # WhatsApp API Provider Selection
-    whatsapp_provider: str = Field(default="twilio", env="WHATSAPP_PROVIDER")  # "twilio" or "meta"
-    
     # Twilio WhatsApp API
     twilio_account_sid: str = Field(..., env="TWILIO_ACCOUNT_SID")
     twilio_auth_token: str = Field(..., env="TWILIO_AUTH_TOKEN")
     twilio_whatsapp_number: str = Field(..., env="TWILIO_WHATSAPP_NUMBER")
-    
-    # Meta WhatsApp Business API (legacy support)
-    whatsapp_phone_number_id: Optional[str] = Field(None, env="WHATSAPP_PHONE_NUMBER_ID")
-    whatsapp_business_account_id: Optional[str] = Field(None, env="WHATSAPP_BUSINESS_ACCOUNT_ID")
-    whatsapp_access_token: Optional[str] = Field(None, env="WHATSAPP_ACCESS_TOKEN")
     verify_token: str = Field(..., env="VERIFY_TOKEN")
 
     # Legacy API keys (no longer used - kept for backward compatibility)

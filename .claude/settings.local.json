@@ -1,27 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)",
-      "Bash(pip3 install:*)",
-      "Bash(python3:*)",
-      "Bash(source:*)",
-      "Bash(pip install:*)",
-      "Bash(python:*)",
-      "Bash(curl:*)",
-      "Bash(lsof:*)",
-      "Bash(xargs kill:*)",
-      "Read(//Users/lucyy/.cache/**)",
-      "Bash(launchctl:*)",
-      "Bash(printenv)",
-      "Read(//etc/**)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(brew install:*)",
-      "Bash(cat:*)",
-      "WebSearch",
-      "Bash(sqlite3:*)",
-      "Bash(pip uninstall:*)"
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

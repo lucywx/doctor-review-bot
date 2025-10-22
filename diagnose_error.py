@@ -94,9 +94,18 @@ async def diagnose():
     # Check 5: Message formatting
     print("\n5️⃣ Testing message formatting...")
     try:
-        from src.whatsapp.formatter import format_review_response
+        from src.whatsapp.formatter import format_review_batch
 
-        message = format_review_response("Dr Tang Boon Nee", reviews)
+        # Test batch formatting (current implementation)
+        message = format_review_batch(
+            batch=reviews[:5] if reviews else [],
+            start_num=1,
+            doctor_name="Dr Tang Boon Nee",
+            total_count=len(reviews),
+            filtered_count=0,
+            remaining=50,
+            quota=50
+        )
         print(f"   ✅ Message formatted successfully")
         print(f"      Message length: {len(message)} characters")
         print(f"      First 100 chars: {message[:100]}...")

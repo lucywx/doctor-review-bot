@@ -69,23 +69,6 @@ class TwilioWhatsAppClient:
             logger.error(f"❌ Failed to send Twilio message: {e}")
             raise
 
-    async def send_formatted_review(self, to: str, doctor_name: str, reviews: list) -> dict:
-        """
-        Send formatted doctor review results via Twilio
-
-        Args:
-            to: Recipient phone number
-            doctor_name: Doctor's name
-            reviews: List of review dicts
-
-        Returns:
-            API response dict
-        """
-        from src.whatsapp.formatter import format_review_response
-
-        formatted_message = format_review_response(doctor_name, reviews)
-        return await self.send_message(to, formatted_message)
-
     async def send_media_message(self, to: str, media_url: str, caption: str = "") -> dict:
         """
         Send media message via Twilio WhatsApp
