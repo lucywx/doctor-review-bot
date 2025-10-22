@@ -120,14 +120,13 @@ def format_welcome_message(remaining: int = None, quota: int = 50) -> str:
     """
     message = """🧑‍⚕️ Meet Your New Doctor Review Assistant!
 
-*STEP 1:* Search any doctor by name. For example, "Dr. Sarah Johnson" 
-*STEP 2:* You get 50 searches monthly
-*STEP 3:* Not every doctor has reviews
+*How to use:*
+Search any doctor by name. For example, "Dr. Sarah Johnson". We will try to find patients' reviews about this doctor. You get 50 searches monthly. Please be aware that not every doctor has reviews.
 
 📢*Important!!*
 We gather reviews from Google, Facebook, forums (not our views!). We're not connected to any hospitals. Always talk to real doctors for medical advice!
 
-Ready to find your perfect doctor? Let's go!"""
+Wanna understand better about any doctor? Let's go!"""
 
     return message
 
@@ -148,64 +147,3 @@ def format_error_message(error_type: str = "general") -> str:
 def format_processing_message() -> str:
     """Message shown while processing"""
     return "🔍 Searching... it takes 15-30 seconds"
-
-
-def format_specialty_selection(doctor_name: str, show_full: bool = True) -> str:
-    """
-    Format specialty selection menu with all 38 specialties
-
-    Args:
-        doctor_name: Doctor's name
-        show_full: Kept for backward compatibility (always shows full list)
-
-    Returns:
-        Formatted specialty selection message
-    """
-
-    # All 38 specialties with skip option
-    all_specialties = [
-        "0. Skip (No specialty)",
-        "1. Cardiology",
-        "2. Dermatology",
-        "3. Endocrinology & Diabetes",
-        "4. Gastroenterology & Hepatology",
-        "5. General Surgery",
-        "6. Obstetrics & Gynaecology",
-        "7. Oncology",
-        "8. Ophthalmology",
-        "9. Orthopaedic Surgery",
-        "10. Paediatrics",
-        "11. Anaesthesiology & Critical Care",
-        "12. Cardiothoracic Surgery",
-        "13. Dentistry",
-        "14. Ear, Nose & Throat (ENT)",
-        "15. Emergency Medicine",
-        "16. Geriatric Medicine",
-        "17. Haematology",
-        "18. Infectious Diseases",
-        "19. Internal Medicine",
-        "20. Nephrology",
-        "21. Neurology",
-        "22. Neurosurgery",
-        "23. Nuclear Medicine",
-        "24. Pain Medicine",
-        "25. Palliative Medicine",
-        "26. Pathology",
-        "27. Plastic & Reconstructive Surgery",
-        "28. Psychiatry",
-        "29. Radiology",
-        "30. Rehabilitation Medicine",
-        "31. Respiratory Medicine",
-        "32. Rheumatology",
-        "33. Robotic Surgery",
-        "34. Spine Surgery",
-        "35. Sports Medicine",
-        "36. Transplant Medicine",
-        "37. Urology",
-        "38. Other"
-    ]
-
-    specialties_text = "\n".join(all_specialties)
-    return f"""📋 *{doctor_name} - Select specialty by number*
-
-{specialties_text}"""
