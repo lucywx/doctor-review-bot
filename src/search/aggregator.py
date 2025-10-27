@@ -6,6 +6,7 @@ import logging
 from typing import List, Dict
 from src.search.google_searcher import google_searcher
 from src.search.openai_web_searcher import openai_web_searcher
+from src.search.google_places import google_places_client
 from src.cache.manager import cache_manager
 from src.config import settings
 
@@ -103,6 +104,30 @@ class SearchAggregator:
                 logger.info(f"✅ Extracted {len(all_reviews)} genuine patient reviews")
             else:
                 logger.warning("⚠️ No URLs found via Google Search")
+
+            # Step 3: Try Google Places API for Google Maps reviews
+            if google_places_client.enabled:
+                logger.info(f"🗺️ Fetching Google Maps reviews via Places API...")
+                places_result = await google_places_client.search_doctor(
+                    doctor_name=doctor_name,
+                    location=search_location
+                )
+
+                if places_result and places_result.get("reviews"):
+                    places_reviews = places_result["reviews"]
+                    logger.info(f"✅ Found {len(places_reviews)} Google Maps reviews (Note: Places API max is 5 reviews)")
+
+                    # Add Google Maps URL to reviews
+                    google_maps_url = places_result.get("url", "")
+                    for review in places_reviews:
+                        review["url"] = google_maps_url
+
+                    all_reviews.extend(places_reviews)
+                    source = f"{source} + google_maps"
+                else:
+                    logger.info("ℹ️ No Google Maps reviews found via Places API")
+            else:
+                logger.info("ℹ️ Google Places API not configured, skipping Google Maps reviews")
 
             if not all_reviews:
                 logger.info(f"❌ No reviews found for {doctor_name}")

@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     twilio_whatsapp_number: str = Field(..., env="TWILIO_WHATSAPP_NUMBER")
     verify_token: str = Field(..., env="VERIFY_TOKEN")
 
-    # Legacy API keys (no longer used - kept for backward compatibility)
-    google_places_api_key: Optional[str] = Field("not_required", env="GOOGLE_PLACES_API_KEY")
+    # Google Places API (for Google Maps reviews - optional but recommended)
+    google_places_api_key: Optional[str] = Field(None, env="GOOGLE_PLACES_API_KEY")
+
+    # Legacy API keys (no longer used)
     facebook_access_token: Optional[str] = Field("not_required", env="FACEBOOK_ACCESS_TOKEN")
 
     # OpenAI API

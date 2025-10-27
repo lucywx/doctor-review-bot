@@ -98,8 +98,11 @@ class GoogleSearcher:
         self.priority_sites = [
             "forum.lowyat.net",      # Malaysia's largest tech/general forum - active medical discussions
             "cari.com.my",           # Popular Malaysian community forum
-            "google.com/maps",       # Google Maps reviews (most reliable source)
+            "facebook.com",          # Facebook pages and groups (hospital pages, patient groups)
         ]
+
+        # Note: google.com/maps removed because Google Custom Search cannot index it
+        # To get Google Maps reviews, we need to use Google Places API instead
 
         # Blacklist: Sites to exclude from search results
         # These sites typically don't contain genuine patient reviews
@@ -167,7 +170,9 @@ class GoogleSearcher:
             # Phase 1: Search priority sites (get ~15 results, ~2-3 per site)
             priority_urls = []
             for site in self.priority_sites:
-                site_results = await self._search_site(query, site, num_results=3)
+                # Google Maps gets more results (most reliable source)
+                num_results = 5 if site == "google.com/maps" else 3
+                site_results = await self._search_site(query, site, num_results=num_results)
                 priority_urls.extend(site_results)
 
             logger.info(f"📌 Priority sites search: {len(priority_urls)} URLs from {len(self.priority_sites)} sites")
@@ -253,9 +258,9 @@ class GoogleSearcher:
         else:
             query_parts.append("Malaysia")
 
-        # Add review keywords - include negative keywords to catch complaints and lawsuits
-        # This ensures we find both positive and negative patient experiences
-        query_parts.append("(review OR reviews OR testimonial OR feedback OR experience OR complaint OR lawsuit OR sued OR malpractice OR negligence)")
+        # Broad keywords to catch all types of patient content
+        # OR logic = match ANY of these keywords (more keywords = more matches)
+        query_parts.append("(review OR reviews OR testimonial OR feedback OR experience OR complaint OR lawsuit OR sued OR malpractice OR negligence OR doctor OR clinic OR patient OR hospital OR medical OR treatment)")
 
         return " ".join(query_parts)
 
@@ -275,6 +280,8 @@ class GoogleSearcher:
             # Add site restriction to query
             site_query = f"{query} site:{site}"
 
+            # For Google Maps, also try broader search if specific search fails
+            # This helps when doctor names are very long or have multiple variations
             params = {
                 "key": self.api_key,
                 "cx": self.search_engine_id,
@@ -569,9 +576,9 @@ If NO genuine patient reviews about {doctor_name} are found, return: {{"reviews"
             start_time = time.time()
             max_processing_time = 25  # seconds (leave 5 seconds buffer for WhatsApp timeout)
 
-            # Process URLs concurrently (COST OPTIMIZATION: reduced from 10 to 5 URLs to cut GPT cost by 50%)
+            # Process URLs concurrently (increased to 10 URLs for better coverage)
             tasks = []
-            for url_dict in urls[:5]:  # Limit to 5 URLs for concurrent processing
+            for url_dict in urls[:10]:  # Limit to 10 URLs for concurrent processing
                 task = self._process_single_url(url_dict, doctor_name, openai_client)
                 tasks.append(task)
 
