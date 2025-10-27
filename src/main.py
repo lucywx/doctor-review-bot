@@ -109,6 +109,18 @@ async def health_check():
         }, 500
 
 
+@app.get("/env-check")
+async def env_check():
+    """Environment variables check endpoint"""
+    return {
+        "GOOGLE_PLACES_API_KEY": settings.google_places_api_key,
+        "GOOGLE_SEARCH_API_KEY": settings.google_search_api_key,
+        "GOOGLE_SEARCH_ENGINE_ID": settings.google_search_engine_id,
+        "OPENAI_API_KEY": settings.openai_api_key[:10] + "..." if settings.openai_api_key else None,
+        "environment": settings.environment
+    }
+
+
 # ===========================================
 # Import routers
 # ===========================================
