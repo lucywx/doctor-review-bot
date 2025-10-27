@@ -15,7 +15,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        # .env file takes priority over environment variables
+        # Environment variables take priority over .env file
         env_ignore_empty=True,
         extra="ignore"
     )
