@@ -156,48 +156,28 @@ class GooglePlacesClient:
 
     def _format_reviews(self, reviews: List[Dict], doctor_name: str) -> List[Dict]:
         """
-        Format reviews into standardized structure with filtering
+        Format reviews into standardized structure
+        Returns ALL reviews without filtering - let GPT-4 do the smart filtering
 
         Args:
             reviews: Raw reviews from Places API
-            doctor_name: Doctor's name for filtering
+            doctor_name: Doctor's name (not used for filtering anymore)
 
         Returns:
-            List of formatted review dictionaries
+            List of formatted review dictionaries (unfiltered)
         """
         formatted = []
-        
-        # Extract key parts of doctor's name for filtering
-        name_parts = doctor_name.lower().replace("dr.", "").replace("dr", "").strip().split()
-        key_name = name_parts[0] if name_parts else doctor_name.lower()
-        
-        for review in reviews:
-            review_text = review.get("text", "").lower()
-            
-            # Filter 1: Must mention doctor's name or be clearly about the doctor
-            if not self._is_review_about_doctor(review_text, key_name, doctor_name):
-                logger.debug(f"⏭️ Filtered out review not about {doctor_name}: {review_text[:50]}...")
-                continue
-            
-            # Filter 2: Skip reviews that are mainly about clinic/hospital policies
-            if self._is_clinic_policy_review(review_text):
-                logger.debug(f"⏭️ Filtered out clinic policy review: {review_text[:50]}...")
-                continue
-            
-            # Filter 3: Skip reviews that are mainly about nurses/staff (not the doctor)
-            if self._is_staff_review(review_text):
-                logger.debug(f"⏭️ Filtered out staff review: {review_text[:50]}...")
-                continue
 
+        for review in reviews:
             formatted.append({
                 "author": review.get("author_name", "Anonymous"),
                 "rating": review.get("rating", 0),
                 "text": review.get("text", ""),
                 "time": review.get("relative_time_description", ""),
-                "source": "Google Maps"
+                "source": "Google Maps (unfiltered - needs GPT-4 analysis)"
             })
 
-        logger.info(f"📊 Filtered {len(reviews)} → {len(formatted)} reviews for {doctor_name}")
+        logger.info(f"📊 Returning {len(formatted)} unfiltered Google Maps reviews for GPT-4 analysis")
         return formatted
 
     def _is_review_about_doctor(self, review_text: str, key_name: str, full_name: str) -> bool:

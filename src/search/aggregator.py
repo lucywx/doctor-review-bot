@@ -117,20 +117,28 @@ class SearchAggregator:
                     places_reviews = places_result["reviews"]
 
                     if places_reviews:
-                        logger.info(f"✅ Found {len(places_reviews)} Google Maps reviews (Note: Places API max is 5 reviews)")
                         logger.info(f"📍 Place: {places_result.get('name', 'Unknown')} (Total reviews: {places_result.get('total_reviews', 0)})")
+                        logger.info(f"🔍 Found {len(places_reviews)} raw Google Maps reviews")
+                        logger.info(f"🤖 Using GPT-4 to filter reviews about {doctor_name}...")
 
-                        # Add Google Maps URL to reviews
-                        google_maps_url = places_result.get("url", "")
-                        for review in places_reviews:
-                            review["url"] = google_maps_url
+                        # Use GPT-4 to intelligently filter Google Maps reviews
+                        filtered_reviews = await self._filter_google_maps_reviews_with_gpt(
+                            reviews=places_reviews,
+                            doctor_name=doctor_name,
+                            place_name=places_result.get('name', 'Unknown'),
+                            google_maps_url=places_result.get("url", "")
+                        )
 
-                        all_reviews.extend(places_reviews)
-                        source = f"{source} + google_maps"
+                        if filtered_reviews:
+                            logger.info(f"✅ GPT-4 filtered {len(places_reviews)} → {len(filtered_reviews)} reviews about {doctor_name}")
+                            all_reviews.extend(filtered_reviews)
+                            source = f"{source} + google_maps"
+                        else:
+                            logger.info(f"ℹ️ No Google Maps reviews are actually about {doctor_name} (filtered by GPT-4)")
                     else:
-                        logger.info(f"ℹ️ Google Maps reviews found but filtered out (not about {doctor_name})")
+                        logger.info(f"ℹ️ No Google Maps reviews returned from Places API")
                 else:
-                    logger.info("ℹ️ No Google Maps reviews found via Places API")
+                    logger.info("ℹ️ No Google Maps place found via Places API")
             else:
                 logger.info("ℹ️ Google Places API not configured, skipping Google Maps reviews")
 
@@ -170,6 +178,99 @@ class SearchAggregator:
                 "reviews": [],
                 "error": str(e)
             }
+
+    async def _filter_google_maps_reviews_with_gpt(
+        self,
+        reviews: List[Dict],
+        doctor_name: str,
+        place_name: str,
+        google_maps_url: str
+    ) -> List[Dict]:
+        """
+        Use GPT-4 to intelligently filter Google Maps reviews
+        Only keep reviews that are actually about the specific doctor
+
+        Args:
+            reviews: List of raw Google Maps reviews
+            doctor_name: Doctor's name
+            place_name: Name of the place (hospital/clinic)
+            google_maps_url: Google Maps URL
+
+        Returns:
+            List of filtered reviews that are about the doctor
+        """
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+        # Prepare reviews for analysis
+        reviews_text = "\n\n".join([
+            f"Review {i+1}:\n{review['text']}"
+            for i, review in enumerate(reviews)
+        ])
+
+        prompt = f"""You are analyzing Google Maps reviews for {place_name}.
+
+Your task: Identify which reviews are specifically about **{doctor_name}** (the doctor).
+
+Reviews to analyze:
+{reviews_text}
+
+Instructions:
+1. Read each review carefully
+2. A review is about {doctor_name} if it:
+   - Mentions the doctor's name (or clear variations like "Dr. {doctor_name.split()[0]}")
+   - Describes their medical care, diagnosis, treatment, or bedside manner
+   - Is clearly a patient's experience with this specific doctor
+
+3. A review is NOT about {doctor_name} if it:
+   - Only mentions other doctors' names
+   - Is about hospital facilities, nurses, admin staff, or general hospital experience
+   - Doesn't mention any specific doctor
+
+Output format:
+Return ONLY a JSON array of review numbers that ARE about {doctor_name}.
+Example: [1, 3] or [] if none match.
+
+Your response:"""
+
+        try:
+            response = await client.chat.completions.create(
+                model=settings.openai_model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=100
+            )
+
+            result_text = response.choices[0].message.content.strip()
+            logger.debug(f"GPT-4 filtering result: {result_text}")
+
+            # Parse the result
+            import json
+            import re
+
+            # Extract JSON array from response
+            json_match = re.search(r'\[[\d\s,]*\]', result_text)
+            if json_match:
+                relevant_indices = json.loads(json_match.group())
+
+                # Filter reviews based on GPT-4's analysis
+                filtered = []
+                for idx in relevant_indices:
+                    if 1 <= idx <= len(reviews):
+                        review = reviews[idx - 1].copy()
+                        review["url"] = google_maps_url
+                        review["source"] = "Google Maps"
+                        filtered.append(review)
+
+                return filtered
+            else:
+                logger.warning("Could not parse GPT-4 response for review filtering")
+                return []
+
+        except Exception as e:
+            logger.error(f"Error using GPT-4 to filter Google Maps reviews: {e}")
+            return []
 
     async def get_review_statistics(self, doctor_id: str) -> Dict:
         """

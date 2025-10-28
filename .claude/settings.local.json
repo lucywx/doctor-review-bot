@@ -9,7 +9,9 @@
       "Bash(curl -s \"https://maps.googleapis.com/maps/api/place/textsearch/json?query=hospital+Malaysia&key=AIzaSyC0O-5Urc47Z1pF8hXpHVHAxC7NZowfjfw\")",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(curl -s \"https://maps.googleapis.com/maps/api/place/textsearch/json?query=Dr+Nicholas+Lim+Lye+Tak+Malaysia&key=AIzaSyC0O-5Urc47Z1pF8hXpHVHAxC7NZowfjfw\")",
+      "Bash(curl -s \"https://maps.googleapis.com/maps/api/place/details/json?place_id=ChIJjR6RfF5JzDERv1dmkS2Bw8o&fields=name,reviews&key=AIzaSyC0O-5Urc47Z1pF8hXpHVHAxC7NZowfjfw\")"
     ],
     "deny": [],
     "ask": []
