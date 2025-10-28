@@ -115,15 +115,20 @@ class SearchAggregator:
 
                 if places_result and places_result.get("reviews"):
                     places_reviews = places_result["reviews"]
-                    logger.info(f"✅ Found {len(places_reviews)} Google Maps reviews (Note: Places API max is 5 reviews)")
 
-                    # Add Google Maps URL to reviews
-                    google_maps_url = places_result.get("url", "")
-                    for review in places_reviews:
-                        review["url"] = google_maps_url
+                    if places_reviews:
+                        logger.info(f"✅ Found {len(places_reviews)} Google Maps reviews (Note: Places API max is 5 reviews)")
+                        logger.info(f"📍 Place: {places_result.get('name', 'Unknown')} (Total reviews: {places_result.get('total_reviews', 0)})")
 
-                    all_reviews.extend(places_reviews)
-                    source = f"{source} + google_maps"
+                        # Add Google Maps URL to reviews
+                        google_maps_url = places_result.get("url", "")
+                        for review in places_reviews:
+                            review["url"] = google_maps_url
+
+                        all_reviews.extend(places_reviews)
+                        source = f"{source} + google_maps"
+                    else:
+                        logger.info(f"ℹ️ Google Maps reviews found but filtered out (not about {doctor_name})")
                 else:
                     logger.info("ℹ️ No Google Maps reviews found via Places API")
             else:

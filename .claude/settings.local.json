@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(curl -s \"https://doctor-review-bot-production.up.railway.app/env-check\")",
+      "Bash(python3:*)",
+      "Bash(railway link:*)",
+      "Bash(chmod:*)",
+      "Bash(curl -s \"https://maps.googleapis.com/maps/api/place/textsearch/json?query=hospital+Malaysia&key=AIzaSyC0O-5Urc47Z1pF8hXpHVHAxC7NZowfjfw\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

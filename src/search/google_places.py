@@ -203,27 +203,37 @@ class GooglePlacesClient:
     def _is_review_about_doctor(self, review_text: str, key_name: str, full_name: str) -> bool:
         """
         Check if review is actually about the specific doctor
-        
+
         Args:
             review_text: Review text in lowercase
             key_name: First name part of doctor
             full_name: Full doctor name
-            
+
         Returns:
             True if review is about the doctor
         """
-        # Must mention doctor's name or "dr" + first name
-        if key_name not in review_text and "dr" not in review_text:
-            return False
-        
-        # Check for generic doctor references that might not be specific
-        generic_terms = ["the doctor", "this doctor", "doctor"]
-        if any(term in review_text for term in generic_terms):
-            # If only generic terms, need more context to be sure
-            if len(review_text) < 50:  # Very short reviews with only generic terms are suspicious
-                return False
-        
-        return True
+        # Extract all name parts for more accurate matching
+        full_name_lower = full_name.lower()
+        name_parts = full_name_lower.replace("dr.", "").replace("dr", "").strip().split()
+
+        # Must mention at least 2 parts of the doctor's name (e.g., "nicholas lim" or "lim tak")
+        # This prevents matching generic "dr" mentions
+        matches = sum(1 for part in name_parts if len(part) > 2 and part in review_text)
+
+        if matches >= 2:
+            # Strong match: mentions at least 2 name parts
+            return True
+
+        # Weak match: only 1 name part mentioned
+        if matches == 1:
+            # Only accept if it's a longer review (more context)
+            # AND mentions "doctor" or "dr" nearby
+            if len(review_text) > 100 and ("doctor" in review_text or "dr" in review_text):
+                return True
+
+        # No match or too generic
+        logger.debug(f"⏭️ Review doesn't mention doctor's name specifically: {review_text[:80]}...")
+        return False
 
     def _is_clinic_policy_review(self, review_text: str) -> bool:
         """
