@@ -135,6 +135,17 @@ class SearchAggregator:
                             source = f"{source} + google_maps"
                         else:
                             logger.info(f"ℹ️ No Google Maps reviews are actually about {doctor_name} (filtered by GPT-4)")
+
+                        # Add Google Maps link as a hint for users to see all reviews
+                        google_maps_url = places_result.get("url", "")
+                        if google_maps_url:
+                            all_reviews.append({
+                                "snippet": f"📍 See all {places_result.get('total_reviews', 0)} reviews on Google Maps (API shows max 5, may not include reviews mentioning {doctor_name})",
+                                "url": google_maps_url,
+                                "review_date": "",
+                                "source": "Google Maps Link"
+                            })
+                            logger.info(f"Added Google Maps link for {places_result.get('total_reviews', 0)} total reviews")
                     else:
                         logger.info(f"ℹ️ No Google Maps reviews returned from Places API")
                 else:
