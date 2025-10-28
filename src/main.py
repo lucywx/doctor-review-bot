@@ -112,8 +112,18 @@ async def health_check():
 @app.get("/env-check")
 async def env_check():
     """Environment variables check endpoint"""
+    import os
+    from src.search.google_places import google_places_client
+
+    raw_env = os.getenv("GOOGLE_PLACES_API_KEY")
+
     return {
-        "GOOGLE_PLACES_API_KEY": settings.google_places_api_key,
+        "GOOGLE_PLACES_API_KEY_raw_env": raw_env,
+        "GOOGLE_PLACES_API_KEY_settings": settings.google_places_api_key,
+        "GOOGLE_PLACES_API_KEY_is_none": settings.google_places_api_key is None,
+        "GOOGLE_PLACES_API_KEY_length": len(settings.google_places_api_key) if settings.google_places_api_key else 0,
+        "places_client_enabled": google_places_client.enabled,
+        "places_client_api_key": google_places_client.api_key[:10] + "..." if google_places_client.api_key else None,
         "GOOGLE_SEARCH_API_KEY": settings.google_search_api_key,
         "GOOGLE_SEARCH_ENGINE_ID": settings.google_search_engine_id,
         "OPENAI_API_KEY": settings.openai_api_key[:10] + "..." if settings.openai_api_key else None,

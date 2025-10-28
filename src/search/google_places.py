@@ -14,15 +14,23 @@ class GooglePlacesClient:
     """Client for Google Places API to fetch reviews from Google Maps"""
 
     def __init__(self):
-        self.api_key = settings.google_places_api_key
+        # Strip whitespace from API key to handle Railway env var issues
+        raw_key = settings.google_places_api_key
+        self.api_key = raw_key.strip() if raw_key else None
         self.base_url = "https://maps.googleapis.com/maps/api/place"
 
-        if not self.api_key or self.api_key == "not_required":
-            logger.warning("Google Places API key not configured")
+        # Check if API key is valid (not None, not empty string, not placeholder)
+        if (
+            not self.api_key
+            or self.api_key == ""
+            or self.api_key == "not_required"
+            or self.api_key.startswith("your_")
+        ):
+            logger.warning(f"Google Places API key not configured (raw: {repr(raw_key)}, processed: {repr(self.api_key)})")
             self.enabled = False
         else:
             self.enabled = True
-            logger.info("Google Places API client initialized")
+            logger.info(f"✅ Google Places API client initialized (key length: {len(self.api_key)})")
 
     async def search_doctor(self, doctor_name: str, location: str = "Malaysia") -> Optional[Dict]:
         """
