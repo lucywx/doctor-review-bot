@@ -104,41 +104,56 @@ Provide specific patient experiences and testimonials."""
             # 解析 Responses API 的输出
             reviews = []
             summary_parts = []
+            citations = []
 
             logger.info(f"📦 Response type: {type(response)}")
 
-            # Responses API 返回复杂的对象结构
-            # 需要遍历 output 中的 messages
-            if hasattr(response, 'output') and hasattr(response.output, 'messages'):
-                for msg in response.output.messages:
-                    if hasattr(msg, 'content'):
-                        for content_block in msg.content:
-                            # 文本内容
-                            if hasattr(content_block, 'text'):
-                                summary_parts.append(content_block.text)
+            # Responses API 返回的 output 是一个列表
+            # 包含 reasoning items, web_search_call items, 和最终的 message
+            if hasattr(response, 'output') and isinstance(response.output, list):
+                logger.info(f"📝 Output items count: {len(response.output)}")
 
-                                # 尝试解析评价信息
-                                # 格式通常是文本描述，包含来源信息
-                                text = content_block.text
+                # 遍历 output 列表，找到 type='message' 的项目
+                for item in response.output:
+                    if hasattr(item, 'type'):
+                        logger.info(f"  - Item type: {item.type}")
 
-                                # 检查是否有 annotations (引用/链接)
-                                if hasattr(content_block, 'annotations'):
-                                    for annotation in content_block.annotations:
-                                        if hasattr(annotation, 'url'):
-                                            # 找到了引用的 URL
-                                            logger.info(f"🔗 Found source: {annotation.url}")
+                        # 记录搜索查询
+                        if item.type == 'web_search_call' and hasattr(item, 'action'):
+                            if hasattr(item.action, 'query'):
+                                logger.info(f"    🔍 Search query: {item.action.query}")
+
+                        # 提取最终消息内容
+                        if item.type == 'message' and hasattr(item, 'content'):
+                            for content_block in item.content:
+                                # 文本内容
+                                if hasattr(content_block, 'text'):
+                                    summary_parts.append(content_block.text)
+                                    logger.info(f"  ✅ Found text content: {len(content_block.text)} chars")
+
+                                    # 检查是否有 annotations (引用/链接)
+                                    if hasattr(content_block, 'annotations'):
+                                        for annotation in content_block.annotations:
+                                            if hasattr(annotation, 'url'):
+                                                citations.append({
+                                                    'url': annotation.url,
+                                                    'title': getattr(annotation, 'title', 'Unknown')
+                                                })
+                                                logger.info(f"  🔗 Citation: {annotation.title}")
 
             # 合并总结
             full_summary = "\n\n".join(summary_parts) if summary_parts else "No results found"
 
             logger.info(f"✅ ChatGPT Responses API 搜索完成")
             logger.info(f"📝 返回文本总结 ({len(summary_parts)} 部分)")
+            logger.info(f"📚 Citations: {len(citations)} sources")
 
             return {
                 "reviews": reviews,  # 暂时返回空列表，因为需要从文本中手动解析
                 "summary": full_summary,
                 "total_count": len(reviews),
                 "source": "chatgpt_responses_api",
+                "citations": citations,  # 引用来源列表
                 "raw_response": full_summary
             }
 
