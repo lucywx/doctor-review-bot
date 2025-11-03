@@ -15,7 +15,8 @@
       "Bash(./test_gpt4_filtering.sh:*)",
       "Bash(curl -s \"https://maps.googleapis.com/maps/api/place/details/json?place_id=ChIJjR6RfF5JzDERv1dmkS2Bw8o&fields=reviews&key=AIzaSyC0O-5Urc47Z1pF8hXpHVHAxC7NZowfjfw\")",
       "Bash(curl -s \"https://maps.google.com/?cid=14610663648832935871\")",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

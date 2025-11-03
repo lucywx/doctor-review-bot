@@ -1,5 +1,14 @@
 # Doctor Review Aggregation WhatsApp Bot
 
+> **📌 实现状态：** ✅ 最优方案已实现（2025-11-03）
+>
+> 本项目已完成核心搜索功能的最优架构实现：
+> - ✅ OpenAI Responses API + gpt-5-mini + web_search（Facebook + 论坛搜索）
+> - ✅ Outscraper API（Google Maps 关键词搜索）
+> - ✅ 简化架构（2 数据源，代码量 -40%，成本优化）
+>
+> 详见：[IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md) | [TECHNICAL_DECISIONS.md](./TECHNICAL_DECISIONS.md)
+
 ## 项目概述
 
 一个基于 WhatsApp 的智能医生评价聚合机器人，帮助用户快速搜索和汇总全网医生评价信息。
@@ -26,31 +35,31 @@
 
 - **后端**：Python 3.10+ / FastAPI
 - **数据库**：PostgreSQL（缓存层）
-- **AI 分析**：OpenAI GPT-4-turbo-mini
-- **消息平台**：WhatsApp Business Cloud API
+- **AI 搜索**：OpenAI Responses API + gpt-5-mini + web_search
+- **消息平台**：WhatsApp Business Cloud API（可选）
 - **搜索引擎**：
-  - Google Places API（Google Maps 评价）
-  - Facebook Graph API（公开主页/群组）
-  - Web Scraping（医院官网公开页面）
+  - Outscraper API（Google Maps 评价 - 关键词搜索）
+  - Responses API with web_search（Facebook 评论 + 论坛）
 
-### 系统组件
+### 系统组件（最优方案）
 
 ```
-用户 WhatsApp
+用户请求
     ↓
-WhatsApp Business API
+搜索聚合器
     ↓
-FastAPI 后端服务
-    ↓
-┌─────────────┴─────────────┐
-│                           │
-缓存数据库 (PostgreSQL)    多引擎搜索聚合
-    ↓                       ↓
-返回缓存结果          实时调用 API
-                            ↓
-                      OpenAI 情感分析
-                            ↓
-                      存入缓存 + 返回结果
+┌─────────────┬─────────────────────────────┐
+↓             ↓                             ↓
+缓存检查    Outscraper        Responses API + gpt-5-mini
+(PostgreSQL) (Google Maps)    (web_search: Facebook+论坛)
+    ↓             ↓                             ↓
+    └─────────────┴─────────────────────────────┘
+                          ↓
+                      合并结果
+                          ↓
+                      缓存保存
+                          ↓
+                      返回用户
 ```
 
 ---
@@ -63,17 +72,22 @@ FastAPI 后端服务
 - **日搜索量**：50 次
 - **月搜索量**：1,500 次
 
-### 成本预算（月度）
+### 成本预算（月度）- 最优方案
 
 | 项目 | 费用 (USD) |
 |------|-----------|
-| WhatsApp Business API | $0（免费额度） |
-| Google Places API | $0（免费额度 $200/月） |
-| Facebook Graph API | $0（公开内容免费） |
-| OpenAI API | $3-5 |
+| Outscraper API | ~$33（Google Maps 关键词搜索，有缓存优化） |
+| Responses API + gpt-5-mini + web_search | ~$13-46（Facebook + 论坛搜索，含 90% 缓存折扣）|
+| WhatsApp Business API | $21-84（可选，按消息数量）|
 | 数据库托管 | $0-5（免费层） |
 | 云服务器 | $5-10 |
-| **总计** | **$15-25/月** |
+| **总计（含 WhatsApp）** | **$72-178/月** |
+| **总计（不含 WhatsApp）** | **$51-94/月** |
+
+> 注：
+> - 成本已通过缓存策略优化，热门医生 90% 查询命中缓存
+> - gpt-5-mini 支持 90% prompt caching 折扣，实际成本可能更低
+> - Responses API web_search 工具约 $30/1000次调用
 
 ---
 
@@ -143,10 +157,9 @@ project02-docreview/
 
 | API | 用途 | 获取地址 | 必需 |
 |-----|------|----------|------|
-| WhatsApp Business Cloud API | 消息收发 | [Meta for Developers](https://developers.facebook.com/) | ✅ |
-| OpenAI API | 情感分析 | [OpenAI Platform](https://platform.openai.com/) | ✅ |
-| Google Places API | Google Maps 评价 | [Google Cloud Console](https://console.cloud.google.com/) | ✅ |
-| Facebook Access Token | Facebook 评价 | Meta 应用中获取 | ✅ |
+| OpenAI API | ChatGPT 搜索（Facebook+论坛）| [OpenAI Platform](https://platform.openai.com/) | ✅ |
+| Outscraper API | Google Maps 评价关键词搜索 | [Outscraper](https://app.outscraper.com/api-keys) | ✅ |
+| WhatsApp Business Cloud API | 消息收发（可选）| [Meta for Developers](https://developers.facebook.com/) | ⚪ |
 
 **2. 系统要求**
 
@@ -181,27 +194,45 @@ cp .env.example .env
 编辑 `.env` 文件，填入你的 API 密钥：
 
 ```ini
-# WhatsApp Business API
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-WHATSAPP_ACCESS_TOKEN=your_access_token
-VERIFY_TOKEN=your_custom_token  # 自定义，用于 webhook 验证
+# ====================================================
+# 最优方案配置 - Outscraper + ChatGPT-4o-mini
+# ====================================================
 
-# Google Places API
-GOOGLE_PLACES_API_KEY=your_google_api_key
+# OpenAI API（ChatGPT）
+# 用于搜索 Facebook 和论坛评价
+OPENAI_API_KEY=your_openai_api_key_here
 
-# Facebook Graph API
-FACEBOOK_ACCESS_TOKEN=your_facebook_token
+# Outscraper API
+# 用于关键词搜索 Google Maps 评价
+OUTSCRAPER_API_KEY=your_outscraper_api_key_here
 
-# OpenAI API
-OPENAI_API_KEY=your_openai_key
-OPENAI_MODEL=gpt-4-turbo
+# ====================================================
+# WhatsApp 配置（可选 - 仅用于 WhatsApp bot）
+# ====================================================
+TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
+TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+TWILIO_WHATSAPP_NUMBER=+1234567890
+VERIFY_TOKEN=your_custom_verify_token_here
 
-# 数据库（本地开发用 SQLite）
-DATABASE_URL=sqlite:///./doctor_review.db
-
+# ====================================================
 # 应用配置
+# ====================================================
 ENVIRONMENT=development
 DEBUG=true
+HOST=0.0.0.0
+PORT=8000
+
+# 缓存配置
+CACHE_DEFAULT_TTL_DAYS=7
+CACHE_HOT_DOCTOR_TTL_DAYS=7
+CACHE_COLD_DOCTOR_TTL_DAYS=3
+
+# 限流配置
+RATE_LIMIT_PER_USER_DAILY=50
+RATE_LIMIT_PER_MINUTE=10
+
+# 日志配置
+LOG_LEVEL=INFO
 ```
 
 #### 3. 初始化数据库
@@ -220,7 +251,26 @@ python scripts/init_db.py
    - Created 5 tables
 ```
 
-#### 4. 启动应用
+#### 4. 测试最优方案
+
+在启动完整应用前，可以先测试搜索功能：
+
+```bash
+# 自动测试（推荐）
+python test_optimal_solution_auto.py
+
+# 或交互式测试
+python test_optimal_solution.py
+```
+
+测试将验证：
+- ✅ Outscraper API 配置状态
+- ✅ ChatGPT API 配置状态
+- ✅ Google Maps 评价搜索功能
+- ✅ Facebook/论坛搜索功能
+- ✅ 结果合并和缓存逻辑
+
+#### 5. 启动应用
 
 ```bash
 # 开发模式（自动重载）
