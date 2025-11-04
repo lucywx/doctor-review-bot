@@ -83,23 +83,24 @@ class ChatGPTSearchClient:
             response = await self.client.responses.create(
                 model="gpt-5-mini",  # ⭐ 使用 gpt-5-mini
                 tools=[{"type": "web_search"}],  # ⭐ 启用 web_search 工具
-                input=f"""Search for patient reviews about {doctor_name} in {location}.
+                reasoning={"effort": "low"},  # ⭐ 降低思考强度，可能减少搜索次数
+                input=f"""Find patient reviews about {doctor_name} in {location}.
 
-Focus on:
-1. Medical forums and discussion boards (Lowyat, Motherhood, BabyCenter, etc.)
-2. Patient review sites and community platforms
-3. Health forums and parenting websites
-4. Blog posts and personal experiences
+Search these specific sites:
+- forum.lowyat.net
+- motherhood.com.my
+- theasianparent.com
+- babycenter.com
 
-For each review you find, extract:
-- The review text (actual patient comment)
-- Author name (if available)
-- Date (if available)
-- Source website name
+Limit your search to 2-3 queries maximum. Focus on quality over quantity.
+
+For each review found, provide:
+- Review text (patient's actual words)
+- Author name
+- Date
 - Source URL
-- Rating (if available)
 
-Provide specific patient experiences and testimonials with details."""
+Return specific patient testimonials only."""
             )
 
             # 解析 Responses API 的输出
