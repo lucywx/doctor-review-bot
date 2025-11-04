@@ -148,8 +148,17 @@ Provide specific patient experiences and testimonials."""
             logger.info(f"📝 返回文本总结 ({len(summary_parts)} 部分)")
             logger.info(f"📚 Citations: {len(citations)} sources")
 
+            # 步骤 2：如果找到了内容，解析为结构化评价
+            if full_summary and full_summary != "No results found" and len(full_summary) > 100:
+                logger.info("🔄 解析文本总结为结构化评价...")
+                structured_reviews = await self._parse_summary_to_reviews(
+                    full_summary, citations, doctor_name
+                )
+                reviews.extend(structured_reviews)
+                logger.info(f"✅ 提取了 {len(structured_reviews)} 条结构化评价")
+
             return {
-                "reviews": reviews,  # 暂时返回空列表，因为需要从文本中手动解析
+                "reviews": reviews,
                 "summary": full_summary,
                 "total_count": len(reviews),
                 "source": "chatgpt_responses_api",
@@ -166,6 +175,93 @@ Provide specific patient experiences and testimonials."""
                 "total_count": 0,
                 "error": str(e)
             }
+
+    async def _parse_summary_to_reviews(
+        self,
+        summary: str,
+        citations: List[Dict],
+        doctor_name: str
+    ) -> List[Dict]:
+        """
+        将搜索总结解析为结构化评价列表
+
+        Args:
+            summary: Responses API 返回的文本总结
+            citations: 引用来源列表
+            doctor_name: 医生名字
+
+        Returns:
+            结构化评价列表
+        """
+        try:
+            # 使用 gpt-4o-mini 解析文本为结构化数据（便宜且快速）
+            parse_response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                response_format={"type": "json_object"},
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "你是一个专业的评价信息提取助手。从搜索结果中提取患者评价，返回JSON格式。"
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""从以下关于 {doctor_name} 的搜索结果中提取患者评价信息。
+
+搜索结果：
+{summary}
+
+引用来源：
+{json.dumps(citations, ensure_ascii=False, indent=2)}
+
+请提取所有提到的患者评价，返回JSON格式：
+{{
+  "reviews": [
+    {{
+      "author_name": "患者姓名（如果提到）或 'Anonymous'",
+      "review_date": "评价日期（YYYY-MM-DD格式，如果提到）或空字符串",
+      "text": "评价内容（患者的原话或总结）",
+      "rating": 评分（1-5，如果提到）或 0,
+      "source": "来源网站名称",
+      "url": "评价链接（从引用来源中匹配）"
+    }}
+  ]
+}}
+
+注意：
+1. 提取所有明确的患者评价和体验
+2. text 字段应该是患者的原话或体验描述
+3. 如果同一来源有多条评价，分别提取
+4. url 需要从引用来源列表中匹配对应的链接
+5. 如果是论坛讨论，提取具体的评价内容，不要只说"有讨论"
+"""
+                    }
+                ]
+            )
+
+            # 解析返回的 JSON
+            result_text = parse_response.choices[0].message.content
+            result_json = json.loads(result_text)
+
+            parsed_reviews = result_json.get("reviews", [])
+
+            # 标准化格式，添加 source 标识
+            standardized_reviews = []
+            for review in parsed_reviews:
+                standardized_reviews.append({
+                    "text": review.get("text", ""),
+                    "rating": review.get("rating", 0),
+                    "author_name": review.get("author_name", "Anonymous"),
+                    "review_date": review.get("review_date", ""),
+                    "url": review.get("url", ""),
+                    "source": "facebook_forum",  # 来源标识
+                    "place_name": review.get("source", "Community Review")
+                })
+
+            return standardized_reviews
+
+        except Exception as e:
+            logger.error(f"❌ 解析文本总结失败: {e}")
+            return []
 
 
 # 创建全局实例（懒加载）
