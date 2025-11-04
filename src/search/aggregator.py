@@ -122,11 +122,21 @@ class SearchAggregator:
 
                 chatgpt_reviews = chatgpt_result.get("reviews", [])
                 chatgpt_summary = chatgpt_result.get("summary", "")
+                chatgpt_citations = chatgpt_result.get("citations", [])
                 facebook_forums_count = len(chatgpt_reviews)
+
+                # Responses API 返回 summary 和 citations，而不是结构化的 reviews
+                # 检查是否有实质内容（summary 或 citations）
+                has_content = (
+                    chatgpt_summary and chatgpt_summary != "No results found" and len(chatgpt_summary) > 50
+                ) or len(chatgpt_citations) > 0
 
                 if chatgpt_reviews:
                     logger.info(f"✅ ChatGPT 找到 {facebook_forums_count} 条 Facebook/论坛评价")
                     all_reviews.extend(chatgpt_reviews)
+                elif has_content:
+                    logger.info(f"✅ ChatGPT 找到患者评价信息（{len(chatgpt_citations)} 个来源）")
+                    # 即使没有结构化 reviews，也记录找到了内容
                 else:
                     logger.warning("⚠️ ChatGPT 未找到评价")
             else:
@@ -135,7 +145,10 @@ class SearchAggregator:
             # 步骤 4：合并结果
             total_count = len(all_reviews)
 
-            if total_count == 0:
+            # 检查是否有任何有价值的内容（结构化评价或 ChatGPT summary）
+            has_chatgpt_content = chatgpt_summary and chatgpt_summary != "No results found" and len(chatgpt_summary) > 50
+
+            if total_count == 0 and not has_chatgpt_content:
                 logger.warning(f"❌ 未找到 {doctor_name} 的评价")
                 return {
                     "doctor_name": doctor_name,
@@ -144,6 +157,8 @@ class SearchAggregator:
                     "google_maps_count": 0,
                     "facebook_forums_count": 0,
                     "total_count": 0,
+                    "chatgpt_summary": chatgpt_summary if 'chatgpt_summary' in locals() else "",
+                    "chatgpt_citations": chatgpt_citations if 'chatgpt_citations' in locals() else [],
                     "message": "未找到评价，建议尝试不同的医生名字拼写"
                 }
 
@@ -156,6 +171,10 @@ class SearchAggregator:
                 logger.warning(f"⚠️ 缓存保存失败（可能数据库未初始化）: {cache_error}")
 
             # 返回结果
+            result_message = f"找到 {total_count} 条评价"
+            if total_count == 0 and has_chatgpt_content:
+                result_message = f"找到患者评价信息（来自 {len(chatgpt_citations)} 个来源）"
+
             return {
                 "doctor_name": doctor_name,
                 "doctor_id": doctor_id,
@@ -164,8 +183,9 @@ class SearchAggregator:
                 "facebook_forums_count": facebook_forums_count,
                 "total_count": total_count,
                 "sources": ["outscraper", "chatgpt"],
-                "chatgpt_summary": chatgpt_summary,
-                "message": f"找到 {total_count} 条评价"
+                "chatgpt_summary": chatgpt_summary if 'chatgpt_summary' in locals() else "",
+                "chatgpt_citations": chatgpt_citations if 'chatgpt_citations' in locals() else [],
+                "message": result_message
             }
 
         except Exception as e:
