@@ -32,8 +32,9 @@ class ChatGPTSearchClient:
             self.client = None
         else:
             self.enabled = True
-            self.client = AsyncOpenAI(api_key=self.api_key)
-            logger.info("✅ ChatGPT Responses API + gpt-5-mini initialized (实时网络搜索)")
+            # 设置 3 分钟超时（180秒），防止无限等待
+            self.client = AsyncOpenAI(api_key=self.api_key, timeout=180.0)
+            logger.info("✅ ChatGPT Responses API + gpt-5-mini initialized (实时网络搜索，超时: 180s)")
 
     async def search_facebook_and_forums(
         self,
