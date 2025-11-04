@@ -76,77 +76,49 @@ class ChatGPTSearchClient:
             }
 
         try:
-            logger.info(f"🔍 ChatGPT Responses API 实时网络搜索: {doctor_name} in {location}")
+            logger.info(f"🔍 ChatGPT 实时网络搜索: {doctor_name} in {location}")
 
-            # 使用 Responses API + gpt-5-mini + web_search 工具
-            response = await self.client.responses.create(
-                model="gpt-5-mini",  # ⭐ 使用 gpt-5-mini（成本优化）
-                tools=[{"type": "web_search"}],  # ⭐ 启用 web_search 工具
-                input=f"""Search for patient reviews about {doctor_name} in {location}.
+            # 使用 gpt-4o-mini-search-preview（更快，30-60秒）
+            # 注：Responses API 太慢（90-120秒），不适合实时响应
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini-search-preview",  # ⭐ 更快的搜索模型
+                web_search_options={},  # ⭐ 启用网络搜索
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"""Search for patient reviews about {doctor_name} in {location}.
 
 Focus on:
 1. Facebook pages and posts mentioning {doctor_name}
-2. Medical forums and discussion boards
+2. Medical forums and discussion boards (Lowyat, Motherhood, etc.)
 3. Patient review sites and community platforms
 4. Health forums and parenting websites
 
-For each review you find, extract:
-- The review text
-- Author name (if available)
-- Date (if available)
+For each review you find, provide:
+- Patient name (or Anonymous)
+- Review date (if available)
+- Review content (actual patient comment)
 - Source website name
 - Source URL
-- Rating (if available)
+- Rating (if mentioned)
 
-Provide specific patient experiences and testimonials."""
+Format the information clearly so it can be extracted."""
+                    }
+                ]
             )
 
-            # 解析 Responses API 的输出
+            # 解析 Chat Completions API 的输出
             reviews = []
-            summary_parts = []
             citations = []
 
             logger.info(f"📦 Response type: {type(response)}")
 
-            # Responses API 返回的 output 是一个列表
-            # 包含 reasoning items, web_search_call items, 和最终的 message
-            if hasattr(response, 'output') and isinstance(response.output, list):
-                logger.info(f"📝 Output items count: {len(response.output)}")
+            # Chat Completions API 返回简单的文本
+            content = response.choices[0].message.content
+            full_summary = content if content else "No results found"
 
-                # 遍历 output 列表，找到 type='message' 的项目
-                for item in response.output:
-                    if hasattr(item, 'type'):
-                        logger.info(f"  - Item type: {item.type}")
-
-                        # 记录搜索查询
-                        if item.type == 'web_search_call' and hasattr(item, 'action'):
-                            if hasattr(item.action, 'query'):
-                                logger.info(f"    🔍 Search query: {item.action.query}")
-
-                        # 提取最终消息内容
-                        if item.type == 'message' and hasattr(item, 'content'):
-                            for content_block in item.content:
-                                # 文本内容
-                                if hasattr(content_block, 'text'):
-                                    summary_parts.append(content_block.text)
-                                    logger.info(f"  ✅ Found text content: {len(content_block.text)} chars")
-
-                                    # 检查是否有 annotations (引用/链接)
-                                    if hasattr(content_block, 'annotations'):
-                                        for annotation in content_block.annotations:
-                                            if hasattr(annotation, 'url'):
-                                                citations.append({
-                                                    'url': annotation.url,
-                                                    'title': getattr(annotation, 'title', 'Unknown')
-                                                })
-                                                logger.info(f"  🔗 Citation: {annotation.title}")
-
-            # 合并总结
-            full_summary = "\n\n".join(summary_parts) if summary_parts else "No results found"
-
-            logger.info(f"✅ ChatGPT Responses API 搜索完成")
-            logger.info(f"📝 返回文本总结 ({len(summary_parts)} 部分)")
-            logger.info(f"📚 Citations: {len(citations)} sources")
+            logger.info(f"✅ ChatGPT 搜索完成")
+            logger.info(f"📝 返回内容: {len(full_summary)} chars")
 
             # 步骤 2：如果找到了内容，解析为结构化评价
             if full_summary and full_summary != "No results found" and len(full_summary) > 100:
